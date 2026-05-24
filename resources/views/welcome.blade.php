@@ -18,7 +18,7 @@
 
     <!-- Floating Cyberpunk Bento Grid Overlay (pointer-events-none to pass click events to Three.js canvas where empty) -->
     <main
-        class="relative z-10 w-full min-h-screen p-4 md:p-6 flex flex-col md:grid md:grid-cols-4 md:grid-rows-6 gap-4 pointer-events-none ui-fade">
+        class="relative z-10 w-full min-h-screen p-4 md:p-6 flex flex-col md:grid md:grid-cols-4 md:grid-rows-6 gap-4 pointer-events-none">
 
         <!-- ROW 1: HEADER PANEL -->
         <header
@@ -150,14 +150,8 @@
 
             <!-- Glowing Toggle Buttons -->
             <div class="flex flex-col gap-3 mb-4">
-                <button id="btn-extract-mode"
-                    class="btn-cyber-cyan w-full py-3 rounded font-semibold text-xs uppercase tracking-widest focus:outline-none">
-                    [Extract Mode]
-                </button>
-                <div class="text-[10px] font-mono text-cyan-600 text-center -mt-2.5 mb-2">Image-to-3D Protocol</div>
-
                 <button id="btn-upload-file"
-                    class="btn-cyber-cyan w-full py-3 rounded font-semibold text-xs uppercase tracking-widest focus:outline-none border-dashed border-2">
+                    class="btn-cyber-cyan w-full py-3 rounded font-semibold text-xs uppercase tracking-widest focus:outline-none">
                     [INJECT SPATIAL SCAN]
                 </button>
                 <div class="text-[10px] font-mono text-cyan-600 text-center -mt-2.5 mb-2">Local PLY / GZ Stream</div>
@@ -224,24 +218,6 @@
             Supports raw .ply and compressed .ply.gz spatial scans
         </div>
     </div>
-
-    <!-- Extract Mode Minimal Toolbar: Floating at bottom center -->
-    <div id="extract-toolbar" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-20 pointer-events-auto cyber-glass px-6 py-3 rounded-full flex gap-4 md:gap-6 items-center hidden border border-cyan-500/30 shadow-[0_0_15px_rgba(0,243,255,0.15)] ui-fade opacity-0">
-        <span class="text-glow-cyan font-bold tracking-widest text-[10px] md:text-xs font-mono uppercase">EXTRACT // SCANNER</span>
-        <div class="h-4 w-px bg-cyan-900/60"></div>
-        <button id="btn-extract-abort" class="btn-cyber-magenta px-3 py-1.5 rounded text-[9px] md:text-[10px] uppercase font-semibold tracking-wider focus:outline-none">
-            [Abort]
-        </button>
-        <button id="btn-extract-orbit" class="btn-cyber-cyan px-3 py-1.5 rounded text-[9px] md:text-[10px] uppercase font-semibold tracking-wider focus:outline-none border-glow-cyan">
-            [Orbit Mode]
-        </button>
-        <button id="btn-extract-select" class="btn-cyber-cyan px-3 py-1.5 rounded text-[9px] md:text-[10px] uppercase font-semibold tracking-wider focus:outline-none">
-            [Select / Extract]
-        </button>
-    </div>
-
-    <!-- Selection Canvas Overlay for Bounding Box Drawing -->
-    <canvas id="selection-canvas" class="fixed inset-0 w-full h-full block z-10 pointer-events-none hidden outline-none"></canvas>
 
 </body>
 
