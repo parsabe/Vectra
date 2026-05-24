@@ -222,8 +222,8 @@ function logConsoleSystem(protocolIndex, protocolName) {
     );
 }
 
-// --- PLY Loader Implementation ---
-function loadPLYModel(url) {
+// --- PLY Loader with Native GZIP Streaming Decompression ---
+async function loadPLYModel(url) {
     if (isModelLoading) {
         logToTerminal('SYS_ALERT: Extraction process already in progress.', 'error');
         return;
@@ -236,7 +236,7 @@ function loadPLYModel(url) {
     loadingOverlay.classList.remove('hidden');
     loadingBarFill.style.width = '0%';
     loadingPercent.textContent = '0% Loaded';
-    loadingText.textContent = 'Allocating Splat memory buffers...';
+    loadingText.textContent = 'Connecting to neural file-stream...';
 
     // Clear previous model if exists
     if (loadedModel) {
@@ -256,107 +256,141 @@ function loadPLYModel(url) {
     // Make the corridor invisible so only the splat model shows up
     hallwayGroup.visible = false;
 
-    const loader = new PLYLoader();
+    try {
+        logToTerminal('Opening compressed stream: /files/point_cloud.ply.gz...');
 
-    loader.load(
-        url,
-        (geometry) => {
-            isModelLoading = false;
-            
-            // Hide loading overlay, show floating splat toolbar
-            loadingOverlay.classList.add('hidden');
-            splatToolbar.classList.remove('hidden');
+        // Fetch compressed file directly
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`HTTP network error ${response.status}`);
+        }
 
-            // Reset toolbar buttons state
-            isSelectModeActive = false;
-            if (btnToggleSelect) {
-                btnToggleSelect.textContent = '[Select Objects: OFF]';
-                btnToggleSelect.classList.remove('btn-cyber-magenta');
-                btnToggleSelect.classList.add('btn-cyber-cyan');
-            }
-            if (btnToggleSplatting) {
-                btnToggleSplatting.textContent = '[3D Splatting: Point Size 0.06]';
-            }
+        const contentLength = +response.headers.get('Content-Length');
+        const reader = response.body.getReader();
 
-            // Set up Material. Supporting both mesh geometries and raw point clouds
-            let material;
-            const isMesh = geometry.index !== null || (geometry.attributes.normal !== undefined);
+        let receivedBytes = 0;
+        const chunks = [];
 
-            if (isMesh) {
-                geometry.computeVertexNormals();
-                material = new THREE.MeshStandardMaterial({
-                    vertexColors: geometry.attributes.color !== undefined,
-                    roughness: 0.4,
-                    metalness: 0.2,
-                    flatShading: true
-                });
+        // Loop to read incoming chunks and track progress
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
 
-                if (geometry.attributes.color === undefined) {
-                    material.color.setHex(0x00f3ff);
-                    material.emissive.setHex(0x001a33);
-                }
+            chunks.push(value);
+            receivedBytes += value.length;
 
-                loadedModel = new THREE.Mesh(geometry, material);
-            } else {
-                // Point cloud scan styling
-                material = new THREE.PointsMaterial({
-                    size: 0.06,
-                    vertexColors: geometry.attributes.color !== undefined,
-                    transparent: true,
-                    opacity: 0.85
-                });
-
-                if (geometry.attributes.color === undefined) {
-                    material.color.setHex(0x00f3ff);
-                }
-
-                loadedModel = new THREE.Points(geometry, material);
-            }
-
-            // Center and scale the geometry
-            geometry.computeBoundingBox();
-            geometry.center();
-
-            const size = new THREE.Vector3();
-            geometry.boundingBox.getSize(size);
-            const maxDim = Math.max(size.x, size.y, size.z);
-            const targetScale = 9.0 / maxDim; // Fit within 9 units box
-            loadedModel.scale.set(targetScale, targetScale, targetScale);
-
-            // Position at grid center
-            loadedModel.position.set(0, 1.0, 0);
-            scene.add(loadedModel);
-
-            // Retarget controls camera view to the center
-            controls.target.set(0, 1.0, 0);
-            camera.position.set(0, 3, 10);
-            controls.update();
-
-            const nodesCount = geometry.attributes.position.count;
-            console.log(`%c[VECTRA] Map complete: ${nodesCount.toLocaleString()} spatial nodes loaded.`, 'color: #39ff14');
-        },
-        (xhr) => {
-            if (xhr.lengthComputable) {
-                const percent = Math.round((xhr.loaded / xhr.total) * 100);
+            if (contentLength) {
+                const percent = Math.round((receivedBytes / contentLength) * 100);
                 loadingBarFill.style.width = `${percent}%`;
                 loadingPercent.textContent = `${percent}% Loaded`;
-                loadingText.textContent = `Streaming point cloud scan data... (${(xhr.loaded / 1024 / 1024).toFixed(1)} MB)`;
+                loadingText.textContent = `Streaming compressed splat cloud... (${(receivedBytes / 1024 / 1024).toFixed(1)} MB / ${(contentLength / 1024 / 1024).toFixed(1)} MB)`;
+            } else {
+                loadingPercent.textContent = 'Streaming...';
+                loadingText.textContent = `Streaming compressed splat cloud... (${(receivedBytes / 1024 / 1024).toFixed(1)} MB)`;
             }
-        },
-        (error) => {
-            isModelLoading = false;
-            console.error('[LOAD_ERR]', error);
-            
-            // Revert UI on error
-            loadingOverlay.classList.add('hidden');
-            bentoGrid.classList.remove('hidden');
-            
-            logToTerminal(`SYS_ERR: Failed to load spatial data matrix.`, 'error');
-            
-            // Restore hallway view
-            hallwayGroup.visible = true;
         }
-    );
+
+        // Hardware-accelerated browser-native Decompression
+        loadingText.textContent = 'Decompressing spatial matrix (GZIP)...';
+        const blob = new Blob(chunks);
+        const ds = new DecompressionStream('gzip');
+        const decompressedStream = blob.stream().pipeThrough(ds);
+        const decompressedResponse = new Response(decompressedStream);
+        const arrayBuffer = await decompressedResponse.arrayBuffer();
+
+        // Parse geometry using PLYLoader (asynchronously to allow DOM redraw first)
+        loadingText.textContent = 'Reconstructing 3D spatial points...';
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        const loader = new PLYLoader();
+        const geometry = loader.parse(arrayBuffer);
+
+        // Hide loading overlay, show floating splat toolbar
+        loadingOverlay.classList.add('hidden');
+        splatToolbar.classList.remove('hidden');
+
+        // Reset toolbar buttons state
+        isSelectModeActive = false;
+        if (btnToggleSelect) {
+            btnToggleSelect.textContent = '[Select Objects: OFF]';
+            btnToggleSelect.classList.remove('btn-cyber-magenta');
+            btnToggleSelect.classList.add('btn-cyber-cyan');
+        }
+        if (btnToggleSplatting) {
+            btnToggleSplatting.textContent = '[3D Splatting: Point Size 0.06]';
+        }
+
+        // Set up Material. Supporting both mesh geometries and raw point clouds
+        let material;
+        const isMesh = geometry.index !== null || (geometry.attributes.normal !== undefined);
+
+        if (isMesh) {
+            geometry.computeVertexNormals();
+            material = new THREE.MeshStandardMaterial({
+                vertexColors: geometry.attributes.color !== undefined,
+                roughness: 0.4,
+                metalness: 0.2,
+                flatShading: true
+            });
+
+            if (geometry.attributes.color === undefined) {
+                material.color.setHex(0x00f3ff);
+                material.emissive.setHex(0x001a33);
+            }
+
+            loadedModel = new THREE.Mesh(geometry, material);
+        } else {
+            // Point cloud scan styling
+            material = new THREE.PointsMaterial({
+                size: 0.06,
+                vertexColors: geometry.attributes.color !== undefined,
+                transparent: true,
+                opacity: 0.85
+            });
+
+            if (geometry.attributes.color === undefined) {
+                material.color.setHex(0x00f3ff);
+            }
+
+            loadedModel = new THREE.Points(geometry, material);
+        }
+
+        // Center and scale the geometry
+        geometry.computeBoundingBox();
+        geometry.center();
+
+        const size = new THREE.Vector3();
+        geometry.boundingBox.getSize(size);
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const targetScale = 9.0 / maxDim; // Fit within 9 units box
+        loadedModel.scale.set(targetScale, targetScale, targetScale);
+
+        // Position at grid center
+        loadedModel.position.set(0, 1.0, 0);
+        scene.add(loadedModel);
+
+        // Retarget controls camera view to the center
+        controls.target.set(0, 1.0, 0);
+        camera.position.set(0, 3, 10);
+        controls.update();
+
+        const nodesCount = geometry.attributes.position.count;
+        console.log(`%c[VECTRA] Map complete: ${nodesCount.toLocaleString()} spatial nodes loaded.`, 'color: #39ff14');
+        isModelLoading = false;
+
+    } catch (error) {
+        isModelLoading = false;
+        console.error('[LOAD_ERR]', error);
+        
+        // Revert UI on error
+        loadingOverlay.classList.add('hidden');
+        bentoGrid.classList.remove('hidden');
+        
+        logToTerminal(`SYS_ERR: Failed to parse spatial data matrix: ${error.message}`, 'error');
+        
+        // Restore hallway view
+        hallwayGroup.visible = true;
+    }
 }
 
 // --- Raycaster & Point/Object Selection ---
@@ -508,7 +542,7 @@ if (btnExtract) {
     btnExtract.addEventListener('click', () => {
         logConsoleSystem(1, 'Extract Mode');
         logToTerminal('Protocol 1 Initiated: Extract Mode...', 'info');
-        loadPLYModel('/files/point_cloud.ply');
+        loadPLYModel('/files/point_cloud.ply.gz');
     });
 }
 
