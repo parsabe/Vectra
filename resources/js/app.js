@@ -257,7 +257,7 @@ async function loadPLYModel(url) {
     hallwayGroup.visible = false;
 
     try {
-        logToTerminal('Opening compressed stream: /files/point_cloud.ply.gz...');
+        logToTerminal('Opening compressed stream: /files/point_cloud_optimized.ply.gz...');
 
         // Fetch compressed file directly
         const response = await fetch(url);
@@ -542,7 +542,7 @@ if (btnExtract) {
     btnExtract.addEventListener('click', () => {
         logConsoleSystem(1, 'Extract Mode');
         logToTerminal('Protocol 1 Initiated: Extract Mode...', 'info');
-        loadPLYModel('/files/point_cloud.ply.gz');
+        loadPLYModel('/files/point_cloud_optimized.ply.gz');
     });
 }
 
