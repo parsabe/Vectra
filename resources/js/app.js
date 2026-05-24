@@ -5,12 +5,20 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
 
 // --- System Telemetry DOM Elements ---
-window.VECTRA_VERSION = "1.0.8-NEURAL-CB-107";
+window.VECTRA_VERSION = "1.1.0-NEURAL-CB-109";
 const telemetryRotX = document.getElementById('telemetry-rot-x');
 const telemetryRotY = document.getElementById('telemetry-rot-y');
 const terminalOutput = document.getElementById('terminal-output');
 const terminalInput = document.getElementById('terminal-input');
 const btnCreator = document.getElementById('btn-creator-mode');
+
+// --- Extract Mode DOM Elements ---
+const btnExtractMode = document.getElementById('btn-extract-mode');
+const extractToolbar = document.getElementById('extract-toolbar');
+const btnExtractAbort = document.getElementById('btn-extract-abort');
+const btnExtractOrbit = document.getElementById('btn-extract-orbit');
+const btnExtractSelect = document.getElementById('btn-extract-select');
+const selectionCanvas = document.getElementById('selection-canvas');
 
 // --- Splat Mode UI Elements ---
 const bentoGrid = document.querySelector('main');
@@ -228,6 +236,21 @@ function logConsoleSystem(protocolIndex, protocolName) {
     );
 }
 
+function clearThreeGroup(group) {
+    while (group.children.length > 0) {
+        const child = group.children[0];
+        group.remove(child);
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) {
+            if (Array.isArray(child.material)) {
+                child.material.forEach(m => m.dispose());
+            } else {
+                child.material.dispose();
+            }
+        }
+    }
+}
+
 // --- PLY Loader with Native GZIP Streaming Decompression ---
 function prepareSceneForModel() {
     // Clear previous model if exists
@@ -242,8 +265,8 @@ function prepareSceneForModel() {
         loadedModel = null;
     }
     
-    // Clear previous selection markers
-    markersGroup.replaceChildren();
+    // Clear previous selection markers safely
+    clearThreeGroup(markersGroup);
 
     // Make the corridor invisible so only the splat model shows up
     hallwayGroup.visible = false;
@@ -582,8 +605,8 @@ if (btnBackMenu) {
             loadedModel = null;
         }
         
-        // Clear selection markers
-        markersGroup.replaceChildren();
+        // Clear selection markers safely
+        clearThreeGroup(markersGroup);
 
         // Transition UI (reveal bento grid, hide toolbar)
         splatToolbar.classList.add('hidden');
@@ -651,7 +674,258 @@ if (btnToggleSplatting) {
     });
 }
 
+// --- Extract Mode State and Interaction Logic ---
+let isExtractMode = false;
+let isSelectionDrawingMode = false;
+let isDrawing = false;
+let startX = 0;
+let startY = 0;
+
+// Setup Selection Canvas size on resize
+function resizeSelectionCanvas() {
+    if (selectionCanvas) {
+        selectionCanvas.width = window.innerWidth;
+        selectionCanvas.height = window.innerHeight;
+    }
+}
+window.addEventListener('resize', resizeSelectionCanvas);
+resizeSelectionCanvas();
+
+// Helper to update Extract Toolbar button active styles
+function updateExtractToolbarUI() {
+    if (!btnExtractOrbit || !btnExtractSelect || !selectionCanvas) return;
+
+    if (isSelectionDrawingMode) {
+        btnExtractSelect.classList.add('btn-active-cyber');
+        btnExtractOrbit.classList.remove('btn-active-cyber');
+        
+        selectionCanvas.classList.remove('pointer-events-none');
+        selectionCanvas.classList.remove('hidden');
+    } else {
+        btnExtractOrbit.classList.add('btn-active-cyber');
+        btnExtractSelect.classList.remove('btn-active-cyber');
+        
+        selectionCanvas.classList.add('pointer-events-none');
+        
+        // Clear canvas context on leaving draw mode
+        const ctx = selectionCanvas.getContext('2d');
+        ctx.clearRect(0, 0, selectionCanvas.width, selectionCanvas.height);
+    }
+}
+
+// Bounding Box Drawing & Event Listeners
+if (selectionCanvas) {
+    const ctx = selectionCanvas.getContext('2d');
+
+    selectionCanvas.addEventListener('pointerdown', (e) => {
+        if (!isExtractMode || !isSelectionDrawingMode) return;
+        isDrawing = true;
+        startX = e.clientX;
+        startY = e.clientY;
+    });
+
+    selectionCanvas.addEventListener('pointermove', (e) => {
+        if (!isDrawing) return;
+        
+        const currentX = e.clientX;
+        const currentY = e.clientY;
+        
+        // Clear canvas for redraw
+        ctx.clearRect(0, 0, selectionCanvas.width, selectionCanvas.height);
+        
+        // Draw glowing bounding box
+        ctx.strokeStyle = '#00f3ff';
+        ctx.lineWidth = 2;
+        ctx.shadowColor = '#00f3ff';
+        ctx.shadowBlur = 10;
+        
+        ctx.strokeRect(startX, startY, currentX - startX, currentY - startY);
+        
+        // Draw matching transparent inner fill
+        ctx.fillStyle = 'rgba(0, 243, 255, 0.1)';
+        ctx.fillRect(startX, startY, currentX - startX, currentY - startY);
+    });
+
+    const endDrawing = (e) => {
+        if (!isDrawing) return;
+        isDrawing = false;
+        
+        const currentX = e.clientX;
+        const currentY = e.clientY;
+        
+        // Clear box drawing overlay
+        ctx.clearRect(0, 0, selectionCanvas.width, selectionCanvas.height);
+        ctx.shadowBlur = 0; // reset shadow glow
+        
+        // Calculate box dimensions
+        const x = Math.min(startX, currentX);
+        const y = Math.min(startY, currentY);
+        const w = Math.abs(currentX - startX);
+        const h = Math.abs(currentY - startY);
+        
+        // Check for meaningful drag size (e.g. > 10px) to ignore simple clicks
+        if (w > 10 && h > 10) {
+            console.log(`[SYSTEM] Target Area Locked: {x: ${x}, y: ${y}, w: ${w}, h: ${h}}`);
+            logToTerminal(`Target Area Locked: x=${x}, y=${y}, w=${w}, h=${h}`, 'success');
+            
+            // Take 3D Canvas crop snapshot
+            captureSelectedArea(x, y, w, h);
+            
+            // Trigger mock DBSE splat hide function
+            hideSplatsInSelection({ x, y, width: w, height: h });
+        }
+    };
+
+    selectionCanvas.addEventListener('pointerup', endDrawing);
+    selectionCanvas.addEventListener('pointerleave', endDrawing);
+}
+
+// 3D Canvas Crop Snapshot Capture Function
+function captureSelectedArea(x, y, w, h) {
+    try {
+        logToTerminal(`Deep Splat Excavation (DBSE) triggered. Capturing snapshot...`, 'info');
+        
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = w;
+        tempCanvas.height = h;
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        // Render Three.js immediately before copying to fill the WebGL drawing buffer
+        renderer.render(scene, camera);
+        
+        // Draw the 3D WebGL canvas into the temporary 2D canvas (accounting for high-DPI scaling)
+        const scale = window.devicePixelRatio || 1;
+        tempCtx.drawImage(
+            canvas,
+            x * scale,
+            y * scale,
+            w * scale,
+            h * scale,
+            0,
+            0,
+            w,
+            h
+        );
+        
+        const dataUrl = tempCanvas.toDataURL('image/png');
+        console.log(`%c[SYSTEM] Snapshot captured:`, 'color: #39ff14', dataUrl);
+        
+        const previewMsg = `[SYSTEM] Target Snapshot Extracted.`;
+        logToTerminal(`${previewMsg}`, 'success');
+        
+        // Create a cool floating micro-preview in the terminal log
+        const img = new Image();
+        img.src = dataUrl;
+        img.style.border = '1px solid #00f3ff';
+        img.style.boxShadow = '0 0 10px rgba(0, 243, 255, 0.5)';
+        img.style.maxWidth = '150px';
+        img.style.marginTop = '6px';
+        img.style.borderRadius = '4px';
+        
+        const line = document.createElement('div');
+        line.className = 'text-glow-green text-green-400 mt-1 flex flex-col gap-1';
+        line.textContent = `> SNAPSHOT PREVIEW:`;
+        line.appendChild(img);
+        
+        if (terminalOutput) {
+            terminalOutput.appendChild(line);
+            terminalOutput.scrollTop = terminalOutput.scrollHeight;
+        }
+
+    } catch (err) {
+        console.error('[SNAPSHOT_ERR]', err);
+        logToTerminal(`SYS_ERR: Failed to capture target snapshot: ${err.message}`, 'error');
+    }
+}
+
+// Mock DBSE Hook
+function hideSplatsInSelection(boundingBox) {
+    console.log(`[SYSTEM] hideSplatsInSelection called with bounding box:`, boundingBox);
+    logToTerminal(`DBSE Hook: Recalculating frustum volume. Splats within coordinates isolated.`, 'info');
+}
+
 // --- Main Menu Buttons binding ---
+if (btnExtractMode) {
+    btnExtractMode.addEventListener('click', () => {
+        logConsoleSystem(1, 'Extract Mode');
+        logToTerminal('Protocol 1 Initiated: Extract Mode (Image-to-3D)...', 'info');
+        
+        isExtractMode = true;
+        isSelectionDrawingMode = false; // Start in orbit controls mode by default
+        
+        // Fade out bento grid UI
+        bentoGrid.classList.add('fade-out');
+        
+        // Fade in minimal extract toolbar
+        if (extractToolbar) {
+            extractToolbar.classList.remove('hidden');
+            setTimeout(() => {
+                extractToolbar.classList.add('fade-in');
+                extractToolbar.classList.remove('opacity-0');
+            }, 50);
+        }
+        
+        // Initialize orbit/drawing modes
+        controls.enabled = true;
+        updateExtractToolbarUI();
+        
+        // Clear any previous markers
+        clearThreeGroup(markersGroup);
+    });
+}
+
+if (btnExtractAbort) {
+    btnExtractAbort.addEventListener('click', () => {
+        logToTerminal('Aborting Extract Mode. Restoring core link...', 'info');
+        
+        isExtractMode = false;
+        isSelectionDrawingMode = false;
+        isDrawing = false;
+        
+        // Reset camera positions & controls
+        controls.enabled = true;
+        controls.target.set(0, 0.5, 0);
+        camera.position.set(0, 3, 10);
+        controls.update();
+        
+        // Hide selection canvas
+        if (selectionCanvas) {
+            selectionCanvas.classList.add('hidden');
+            selectionCanvas.classList.add('pointer-events-none');
+        }
+        
+        // Fade out extract toolbar
+        if (extractToolbar) {
+            extractToolbar.classList.remove('fade-in');
+            extractToolbar.classList.add('opacity-0');
+            setTimeout(() => {
+                extractToolbar.classList.add('hidden');
+            }, 500);
+        }
+        
+        // Fade in bento grid UI
+        bentoGrid.classList.remove('fade-out');
+    });
+}
+
+if (btnExtractOrbit) {
+    btnExtractOrbit.addEventListener('click', () => {
+        isSelectionDrawingMode = false;
+        controls.enabled = true;
+        updateExtractToolbarUI();
+        logToTerminal('Orbit Navigation Mode active. Hold Left Click + Drag to rotate.', 'info');
+    });
+}
+
+if (btnExtractSelect) {
+    btnExtractSelect.addEventListener('click', () => {
+        isSelectionDrawingMode = true;
+        controls.enabled = false;
+        updateExtractToolbarUI();
+        logToTerminal('Select / Extract active. Drag bounding box over 3D scan.', 'info');
+    });
+}
+
 if (btnCreator) {
     btnCreator.addEventListener('click', () => {
         logConsoleSystem(2, 'Creator Mode');
@@ -674,11 +948,14 @@ if (terminalInput) {
                 const query = inputVal.toLowerCase();
                 if (query === 'help') {
                     logToTerminal('Available Protocols:', 'info');
+                    logToTerminal(' - extract : Trigger Extract Mode (2D bounding box tools)', 'info');
                     logToTerminal(' - upload  : Initialize custom .ply cloud upload', 'info');
                     logToTerminal(' - creator : Trigger Text-to-3D spatial diffusion', 'info');
                     logToTerminal(' - clear   : Flush neural terminal console buffer', 'info');
-                } else if (query === 'upload' || query === 'extract' || query === 'protocol 1') {
-                    btnUploadFile.click();
+                } else if (query === 'extract' || query === 'protocol 1') {
+                    if (btnExtractMode) btnExtractMode.click();
+                } else if (query === 'upload') {
+                    if (btnUploadFile) btnUploadFile.click();
                 } else if (query === 'creator' || query === 'protocol 2') {
                     btnCreator.click();
                 } else if (query === 'clear') {

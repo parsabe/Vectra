@@ -168,3 +168,26 @@ body {
     animation: cyber-scan 4s linear infinite;
     pointer-events: none;
 }
+
+/* UI Transition Fades */
+.ui-fade {
+    transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.5s;
+}
+
+.fade-out {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+.fade-in {
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+.btn-active-cyber {
+    background: rgba(0, 243, 255, 0.35) !important;
+    box-shadow: 0 0 15px rgba(0, 243, 255, 0.6) !important;
+    border-color: #00f3ff !important;
+}
+
