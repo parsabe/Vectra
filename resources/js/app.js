@@ -3,6 +3,139 @@ import './bootstrap';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
+import * as GaussianSplats3D from '@mkkellogg/gaussian-splats-3d';
+import SortWorker from './splat-sort.worker.js?worker';
+
+const LoaderStatus = { Downloading: 0, Processing: 1, Done: 2 };
+let viewer = null;
+let pendingSplatDisplay = null;
+
+// Global splatScale multiplier configuration
+window.VECTRA_SPLAT_SCALE = 0.05; // Default multiplier to shrink bloated splats
+
+// Hook into PlyParser.parseToUncompressedSplatArray
+const originalParseArray = GaussianSplats3D.PlyParser.parseToUncompressedSplatArray;
+GaussianSplats3D.PlyParser.parseToUncompressedSplatArray = function(plyBuffer, outSphericalHarmonicsDegree) {
+    const splatArray = originalParseArray(plyBuffer, outSphericalHarmonicsDegree);
+    if (splatArray && splatArray.splats) {
+        adjustSplatArrayScales(splatArray);
+    }
+    return splatArray;
+};
+
+// Hook into PlyParser.parseToUncompressedSplatBuffer
+const originalParseBuffer = GaussianSplats3D.PlyParser.parseToUncompressedSplatBuffer;
+GaussianSplats3D.PlyParser.parseToUncompressedSplatBuffer = function(plyBuffer, outSphericalHarmonicsDegree) {
+    const splatBuffer = originalParseBuffer(plyBuffer, outSphericalHarmonicsDegree);
+    if (splatBuffer) {
+        adjustSplatBufferScales(splatBuffer);
+    }
+    return splatBuffer;
+};
+
+// Helper: Adjust scale array
+function adjustSplatArrayScales(splatArray) {
+    const splatScale = window.VECTRA_SPLAT_SCALE !== undefined ? window.VECTRA_SPLAT_SCALE : 1.0;
+    const splats = splatArray.splats;
+    const SCALE0_IDX = 3;
+    const SCALE1_IDX = 4;
+    const SCALE2_IDX = 5;
+
+    if (splats.length === 0) return;
+
+    // Detect if scales are linear (where Math.exp incorrectly bloated them)
+    let sumScale = 0;
+    const sampleCount = Math.min(splats.length, 100);
+    for (let i = 0; i < sampleCount; i++) {
+        sumScale += splats[i][SCALE0_IDX];
+    }
+    const avgScale = sumScale / sampleCount;
+    const isExponentiatedLinear = avgScale > 0.5;
+
+    console.log(`[VECTRA] Array Scale Diagnostics: avgScale=${avgScale.toFixed(4)}, isExponentiatedLinear=${isExponentiatedLinear}`);
+
+    for (let i = 0; i < splats.length; i++) {
+        const splat = splats[i];
+        let s0 = splat[SCALE0_IDX];
+        let s1 = splat[SCALE1_IDX];
+        let s2 = splat[SCALE2_IDX];
+
+        if (isExponentiatedLinear) {
+            s0 = Math.log(Math.max(s0, 1e-5));
+            s1 = Math.log(Math.max(s1, 1e-5));
+            s2 = Math.log(Math.max(s2, 1e-5));
+        }
+
+        splat[SCALE0_IDX] = Math.max(s0 * splatScale, 1e-5);
+        splat[SCALE1_IDX] = Math.max(s1 * splatScale, 1e-5);
+        splat[SCALE2_IDX] = Math.max(s2 * splatScale, 1e-5);
+    }
+}
+
+// Helper: Adjust scale buffer
+function adjustSplatBufferScales(splatBuffer) {
+    const splatScale = window.VECTRA_SPLAT_SCALE !== undefined ? window.VECTRA_SPLAT_SCALE : 1.0;
+    const bufferData = splatBuffer.bufferData;
+    const splatCount = splatBuffer.splatCount;
+
+    if (splatBuffer.compressionLevel !== 0) {
+        console.warn('[VECTRA] SplatBuffer compression level is not 0, skipping scale adjustment.');
+        return;
+    }
+
+    const bytesPerSplat = splatBuffer.bytesPerSplat;
+    const splatBufferDataOffsetBytes = splatBuffer.headerSizeBytes + splatBuffer.sectionHeaderSizeBytes;
+    const scaleOffset = 12;
+
+    let sumScale = 0;
+    const sampleCount = Math.min(splatCount, 100);
+    const view = new DataView(bufferData);
+
+    for (let i = 0; i < sampleCount; i++) {
+        const offset = splatBufferDataOffsetBytes + i * bytesPerSplat + scaleOffset;
+        sumScale += view.getFloat32(offset, true);
+    }
+    const avgScale = sumScale / sampleCount;
+    const isExponentiatedLinear = avgScale > 0.5;
+
+    console.log(`[VECTRA] Buffer Scale Diagnostics: avgScale=${avgScale.toFixed(4)}, isExponentiatedLinear=${isExponentiatedLinear}`);
+
+    for (let i = 0; i < splatCount; i++) {
+        const offset = splatBufferDataOffsetBytes + i * bytesPerSplat + scaleOffset;
+        let s0 = view.getFloat32(offset, true);
+        let s1 = view.getFloat32(offset + 4, true);
+        let s2 = view.getFloat32(offset + 8, true);
+
+        if (isExponentiatedLinear) {
+            s0 = Math.log(Math.max(s0, 1e-5));
+            s1 = Math.log(Math.max(s1, 1e-5));
+            s2 = Math.log(Math.max(s2, 1e-5));
+        }
+
+        view.setFloat32(offset, Math.max(s0 * splatScale, 1e-5), true);
+        view.setFloat32(offset + 4, Math.max(s1 * splatScale, 1e-5), true);
+        view.setFloat32(offset + 8, Math.max(s2 * splatScale, 1e-5), true);
+    }
+}
+
+// Intercept window.Worker during setupSortWorker to bind the Vite worker
+const originalSetupSortWorker = GaussianSplats3D.Viewer.prototype.setupSortWorker;
+GaussianSplats3D.Viewer.prototype.setupSortWorker = function(splatMesh) {
+    const originalWorker = window.Worker;
+    window.Worker = function(url, options) {
+        if (typeof url === 'string' && url.startsWith('blob:')) {
+            console.log('[VECTRA] Intercepted splat sort worker creation, using Vite worker.');
+            return new SortWorker();
+        }
+        return new originalWorker(url, options);
+    };
+
+    try {
+        return originalSetupSortWorker.call(this, splatMesh);
+    } finally {
+        window.Worker = originalWorker;
+    }
+};
 
 // --- System Telemetry DOM Elements ---
 window.VECTRA_VERSION = "1.0.9-NEURAL-CB-108";
@@ -39,7 +172,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x020204);
 scene.fog = new THREE.FogExp2(0x020204, 0.025);
 
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 500);
 camera.position.set(0, 3, 10);
 
 const renderer = new THREE.WebGLRenderer({
@@ -49,7 +182,7 @@ const renderer = new THREE.WebGLRenderer({
     preserveDrawingBuffer: true  // Required for toDataURL() screenshot capture
 });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(window.devicePixelRatio);
 
 // --- Lights ---
 const ambientLight = new THREE.AmbientLight(0x0a0c10, 1.2);
@@ -273,8 +406,25 @@ function animate() {
         animateExtractScene(elapsedTime);
     }
 
-    // Render Scene
-    renderer.render(scene, camera);
+    // Render Scene (Viewer vs Fallback)
+    if (viewer && viewer.initialized) {
+        viewer.update();
+
+        if (viewer.splatRenderReady) {
+            if (pendingSplatDisplay) {
+                const { fileName, objectURL: blobURL } = pendingSplatDisplay;
+                pendingSplatDisplay = null;
+                displayLoadedSplatViewer(fileName);
+                if (blobURL) URL.revokeObjectURL(blobURL);
+            }
+            viewer.render();
+        } else {
+            controls.update();
+            renderer.render(scene, camera);
+        }
+    } else {
+        renderer.render(scene, camera);
+    }
 
     // Update telemetry in UI (only when main menu bento grid is visible)
     if (telemetryRotX && telemetryRotY && !bentoGrid.classList.contains('hidden')) {
@@ -293,7 +443,7 @@ window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(window.devicePixelRatio);
 });
 
 // --- Cyberpunk Terminal Utilities ---
@@ -341,7 +491,18 @@ function clearThreeGroup(group) {
 }
 
 // --- PLY Loader with Native GZIP Streaming Decompression ---
-function prepareSceneForModel() {
+async function prepareSceneForModel() {
+    // If a viewer already exists, dispose of it first
+    if (viewer) {
+        const oldViewer = viewer;
+        viewer = null;
+        try {
+            await oldViewer.dispose();
+        } catch (e) {
+            console.error('[DISPOSE_ERR]', e);
+        }
+    }
+
     // Clear previous model if exists
     if (loadedModel) {
         scene.remove(loadedModel);
@@ -436,6 +597,35 @@ function displayLoadedGeometry(geometry, fileName) {
     logToTerminal(`Neural stream mapped: ${nodesCount.toLocaleString()} nodes parsed successfully.`, 'success');
 }
 
+function displayLoadedSplatViewer(fileName) {
+    // Hide loading overlay, show floating splat toolbar
+    loadingOverlay.classList.add('hidden');
+    splatToolbar.classList.remove('hidden');
+
+    // Reset toolbar buttons state
+    isSelectModeActive = false;
+    if (btnToggleSelect) {
+        btnToggleSelect.textContent = '[Select Objects: OFF]';
+        btnToggleSelect.classList.remove('btn-cyber-magenta');
+        btnToggleSelect.classList.add('btn-cyber-cyan');
+    }
+    if (btnToggleSplatting) {
+        btnToggleSplatting.textContent = '[3D Splatting: Mode DENSE SPLAT]';
+    }
+
+    // Keep OrbitControls enabled
+    controls.enabled = true;
+    controls.target.set(0, 1.0, 0);
+    camera.position.set(0, 3, 10);
+    controls.update();
+
+    // Log success
+    const splatMesh = viewer.splatMesh;
+    const splatCount = splatMesh.getSplatCount(true);
+    console.log(`%c[VECTRA] Splat viewer active: ${splatCount.toLocaleString()} spatial nodes loaded from ${fileName}.`, 'color: #39ff14');
+    logToTerminal(`Neural stream mapped: ${splatCount.toLocaleString()} splat nodes parsed successfully.`, 'success');
+}
+
 async function loadPLYModel(url) {
     if (isModelLoading) {
         logToTerminal('SYS_ALERT: Extraction process already in progress.', 'error');
@@ -447,14 +637,15 @@ async function loadPLYModel(url) {
     // Transition UI to Splat loading state (everything disappears)
     bentoGrid.classList.add('hidden');
     loadingOverlay.classList.remove('hidden');
-    loadingBarFill.style.width = '20%';
-    loadingPercent.textContent = 'Streaming...';
-    loadingText.textContent = 'Connecting to neural file-stream (6.9 MB)...';
+    loadingBarFill.style.width = '10%';
+    loadingPercent.textContent = '0%';
+    loadingText.textContent = 'Connecting to neural file-stream...';
 
-    prepareSceneForModel();
+    await prepareSceneForModel();
 
+    let objectURL = null;
     try {
-        logToTerminal('Opening compressed stream: /files/point_cloud_optimized.ply.gz...');
+        logToTerminal(`Opening compressed stream: ${url}...`);
 
         // Fetch compressed file directly
         const response = await fetch(url);
@@ -462,7 +653,7 @@ async function loadPLYModel(url) {
             throw new Error(`HTTP network error ${response.status}`);
         }
 
-        loadingBarFill.style.width = '60%';
+        loadingBarFill.style.width = '30%';
         loadingText.textContent = 'Decompressing spatial matrix (GZIP)...';
 
         // Read the response as ArrayBuffer in one go
@@ -474,30 +665,95 @@ async function loadPLYModel(url) {
         const decompressedResponse = new Response(decompressedStream);
         const arrayBuffer = await decompressedResponse.arrayBuffer();
 
-        loadingBarFill.style.width = '90%';
-        loadingText.textContent = 'Reconstructing 3D spatial points...';
-        
-        // Asynchronous delay to let DOM elements redraw
-        await new Promise(resolve => setTimeout(resolve, 50));
+        objectURL = URL.createObjectURL(new Blob([arrayBuffer], { type: 'application/octet-stream' }));
 
-        const loader = new PLYLoader();
-        const geometry = loader.parse(arrayBuffer);
+        logToTerminal('Initializing splat render pipeline...');
 
-        displayLoadedGeometry(geometry, 'point_cloud_optimized.ply.gz');
+        // Initialize GaussianSplats3D.Viewer
+        viewer = new GaussianSplats3D.Viewer({
+            'selfDrivenMode': false,
+            'useBuiltInControls': false,
+            'renderer': renderer,
+            'threeScene': scene,
+            'camera': camera,
+            'gpuAcceleratedSort': false, // Force WebWorker-based sorting to fix depth-sorting failures
+            'enableOptionalEffects': true,
+            'sharedMemoryForWorkers': false, // Avoid COOP/COEP SharedArrayBuffer CORS issues
+            'optimizeSplatData': false, // Ensure parseToUncompressedSplatArray path is hit
+            'showLoadingUI': false
+        });
+
+        camera.rotation.order = 'YXZ';
+
+        // Load splat scene with smart two-phase progress mapping:
+        // Downloading phase → 0–49%, Processing phase → 50–99%
+        await viewer.addSplatScene(objectURL, {
+            'splatAlphaRemovalThreshold': 5,
+            'format': GaussianSplats3D.SceneFormat.Ply,
+            'onProgress': (percentComplete, percentCompleteLabel, loaderStatus) => {
+                let mappedPercent;
+                if (loaderStatus === LoaderStatus.Downloading) {
+                    mappedPercent = Math.round(percentComplete * 0.49);
+                    loadingText.textContent = `Streaming neural matrix (${percentCompleteLabel || Math.round(percentComplete) + '%'} downloaded)...`;
+                } else if (loaderStatus === LoaderStatus.Processing) {
+                    mappedPercent = 50 + Math.round(percentComplete * 0.49);
+                    loadingText.textContent = `Reconstructing 3D spatial matrix (${Math.round(percentComplete)}% built)...`;
+                } else if (loaderStatus === LoaderStatus.Done) {
+                    loadingBarFill.style.width = '99%';
+                    loadingPercent.textContent = '99%';
+                    loadingText.textContent = `Neural matrix compiled. Awaiting sort worker...`;
+                    return;
+                } else {
+                    mappedPercent = Math.round(percentComplete);
+                }
+                loadingBarFill.style.width = `${mappedPercent}%`;
+                loadingPercent.textContent = `${mappedPercent}%`;
+                console.log(`[VECTRA LOADER] Stream progress: ${mappedPercent}% (raw ${percentComplete.toFixed(1)}%, phase ${loaderStatus})`);
+            }
+        });
+
         isModelLoading = false;
+        loadingText.textContent = 'Initialising render pipeline...';
+        pendingSplatDisplay = { fileName: url, objectURL };
+        objectURL = null; // Transfer ownership to pendingSplatDisplay
 
     } catch (error) {
-        isModelLoading = false;
-        console.error('[LOAD_ERR]', error);
-        
-        // Revert UI on error
-        loadingOverlay.classList.add('hidden');
-        bentoGrid.classList.remove('hidden');
-        
-        logToTerminal(`SYS_ERR: Failed to load spatial data matrix: ${error.message}`, 'error');
-        
-        // Restore hallway view
-        hallwayGroup.visible = true;
+        console.error('[GS_LOAD_ERR] Falling back to standard PLYLoader.', error);
+        logToTerminal('GS_LOAD_ERR: Falling back to standard point cloud rendering...', 'info');
+
+        // Cleanup viewer if created
+        if (viewer) {
+            await viewer.dispose();
+            viewer = null;
+        }
+
+        // Retry with fallback PLYLoader
+        try {
+            // Re-fetch and decompress if objectURL failed
+            const response = await fetch(url);
+            const compressedBuffer = await response.arrayBuffer();
+            const ds = new DecompressionStream('gzip');
+            const decompressedStream = new Response(compressedBuffer).body.pipeThrough(ds);
+            const decompressedResponse = new Response(decompressedStream);
+            const arrayBuffer = await decompressedResponse.arrayBuffer();
+
+            const loader = new PLYLoader();
+            const geometry = loader.parse(arrayBuffer);
+
+            displayLoadedGeometry(geometry, 'point_cloud_optimized.ply.gz');
+            isModelLoading = false;
+        } catch (fallbackError) {
+            isModelLoading = false;
+            console.error('[FALLBACK_LOAD_ERR]', fallbackError);
+            loadingOverlay.classList.add('hidden');
+            bentoGrid.classList.remove('hidden');
+            logToTerminal(`SYS_ERR: Failed to load spatial data: ${fallbackError.message}`, 'error');
+            hallwayGroup.visible = true;
+        }
+    } finally {
+        if (objectURL) {
+            URL.revokeObjectURL(objectURL);
+        }
     }
 }
 
@@ -518,18 +774,14 @@ async function handleLocalFile(file) {
     bentoGrid.classList.add('hidden');
     loadingOverlay.classList.remove('hidden');
     loadingBarFill.style.width = '10%';
-    loadingPercent.textContent = 'Reading...';
-    loadingText.textContent = `Reading local file: ${name} (${sizeMB} MB)...`;
+    loadingPercent.textContent = '0%';
+    loadingText.textContent = `Reading local file: ${name}...`;
 
-    prepareSceneForModel();
+    await prepareSceneForModel();
 
+    let objectURL = null;
     try {
-        // Read file using modern Promise-based Blob.arrayBuffer()
-        // This is extremely fast (virtually instantaneous for local files) and avoids FileReader callback issues.
         const arrayBuffer = await file.arrayBuffer();
-
-        loadingBarFill.style.width = '50%';
-        loadingPercent.textContent = 'Processing...';
 
         let decompressedBuffer = arrayBuffer;
         if (name.toLowerCase().endsWith('.gz')) {
@@ -540,30 +792,101 @@ async function handleLocalFile(file) {
             decompressedBuffer = await decompressedResponse.arrayBuffer();
         }
 
-        loadingBarFill.style.width = '85%';
-        loadingText.textContent = 'Reconstructing 3D spatial points...';
-        
-        // Brief timeout to let the UI update and draw the progress bar
-        await new Promise(resolve => setTimeout(resolve, 50));
+        objectURL = URL.createObjectURL(new Blob([decompressedBuffer], { type: 'application/octet-stream' }));
 
-        const loader = new PLYLoader();
-        const geometry = loader.parse(decompressedBuffer);
+        // Determine correct SceneFormat
+        let format = GaussianSplats3D.SceneFormat.Ply;
+        const nameLower = name.toLowerCase();
+        if (nameLower.endsWith('.ksplat')) {
+            format = GaussianSplats3D.SceneFormat.KSplat;
+        } else if (nameLower.endsWith('.splat')) {
+            format = GaussianSplats3D.SceneFormat.Splat;
+        } else if (nameLower.endsWith('.spz')) {
+            format = GaussianSplats3D.SceneFormat.Spz;
+        }
 
-        displayLoadedGeometry(geometry, name);
+        // Initialize GaussianSplats3D.Viewer
+        viewer = new GaussianSplats3D.Viewer({
+            'selfDrivenMode': false,
+            'useBuiltInControls': false,
+            'renderer': renderer,
+            'threeScene': scene,
+            'camera': camera,
+            'gpuAcceleratedSort': false,
+            'enableOptionalEffects': true,
+            'sharedMemoryForWorkers': false,
+            'optimizeSplatData': false,
+            'showLoadingUI': false
+        });
+
+        camera.rotation.order = 'YXZ';
+
+        await viewer.addSplatScene(objectURL, {
+            'splatAlphaRemovalThreshold': 5,
+            'format': format,
+            'onProgress': (percentComplete, percentCompleteLabel, loaderStatus) => {
+                let mappedPercent;
+                if (loaderStatus === LoaderStatus.Downloading) {
+                    mappedPercent = Math.round(percentComplete * 0.49);
+                    loadingText.textContent = `Reading local buffer (${percentCompleteLabel || Math.round(percentComplete) + '%'} buffered)...`;
+                } else if (loaderStatus === LoaderStatus.Processing) {
+                    mappedPercent = 50 + Math.round(percentComplete * 0.49);
+                    loadingText.textContent = `Reconstructing 3D spatial matrix (${Math.round(percentComplete)}% built)...`;
+                } else if (loaderStatus === LoaderStatus.Done) {
+                    loadingBarFill.style.width = '99%';
+                    loadingPercent.textContent = '99%';
+                    loadingText.textContent = `Neural matrix compiled. Awaiting sort worker...`;
+                    return;
+                } else {
+                    mappedPercent = Math.round(percentComplete);
+                }
+                loadingBarFill.style.width = `${mappedPercent}%`;
+                loadingPercent.textContent = `${mappedPercent}%`;
+                console.log(`[VECTRA LOADER] Local progress: ${mappedPercent}% (raw ${percentComplete.toFixed(1)}%, phase ${loaderStatus})`);
+            }
+        });
+
         isModelLoading = false;
+        loadingText.textContent = 'Initialising render pipeline...';
+        pendingSplatDisplay = { fileName: name, objectURL };
+        objectURL = null; // Transfer ownership to pendingSplatDisplay
 
     } catch (error) {
-        isModelLoading = false;
-        console.error('[LOCAL_LOAD_ERR]', error);
-        
-        // Revert UI on error
-        loadingOverlay.classList.add('hidden');
-        bentoGrid.classList.remove('hidden');
-        
-        logToTerminal(`SYS_ERR: Failed to parse local file: ${error.message}`, 'error');
-        
-        // Restore hallway view
-        hallwayGroup.visible = true;
+        console.error('[GS_LOCAL_LOAD_ERR] Falling back to standard PLYLoader.', error);
+        logToTerminal('GS_LOAD_ERR: Falling back to standard point cloud rendering...', 'info');
+
+        if (viewer) {
+            await viewer.dispose();
+            viewer = null;
+        }
+
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            let decompressedBuffer = arrayBuffer;
+            if (name.toLowerCase().endsWith('.gz')) {
+                const ds = new DecompressionStream('gzip');
+                const decompressedStream = new Response(arrayBuffer).body.pipeThrough(ds);
+                const decompressedResponse = new Response(decompressedStream);
+                decompressedBuffer = await decompressedResponse.arrayBuffer();
+            }
+
+            const loader = new PLYLoader();
+            const geometry = loader.parse(decompressedBuffer);
+
+            displayLoadedGeometry(geometry, name);
+            isModelLoading = false;
+        } catch (fallbackError) {
+            isModelLoading = false;
+            console.error('[LOCAL_FALLBACK_LOAD_ERR]', fallbackError);
+            loadingOverlay.classList.add('hidden');
+            bentoGrid.classList.remove('hidden');
+            logToTerminal(`SYS_ERR: Failed to parse local file: ${fallbackError.message}`, 'error');
+            hallwayGroup.visible = true;
+        }
+    } finally {
+        if (objectURL) {
+            URL.revokeObjectURL(objectURL);
+        }
     }
 }
 
@@ -626,7 +949,7 @@ const mouse = new THREE.Vector2();
 
 canvas.addEventListener('click', (event) => {
     // Raycast only if splat mode is active, model is loaded, and Select mode is toggled ON
-    if (!loadedModel || isModelLoading || !isSelectModeActive) return;
+    if ((!loadedModel && !viewer) || isModelLoading || !isSelectModeActive) return;
     if (event.target !== canvas) return;
 
     // Calculate normalized device coordinates
@@ -681,7 +1004,18 @@ canvas.addEventListener('click', (event) => {
 
 // 1. Back to Menu
 if (btnBackMenu) {
-    btnBackMenu.addEventListener('click', () => {
+    btnBackMenu.addEventListener('click', async () => {
+        // Dispose of viewer safely
+        if (viewer) {
+            const oldViewer = viewer;
+            viewer = null;
+            try {
+                await oldViewer.dispose();
+            } catch (e) {
+                console.error('[DISPOSE_ERR]', e);
+            }
+        }
+
         // Remove loaded model
         if (loadedModel) {
             scene.remove(loadedModel);
@@ -741,8 +1075,20 @@ if (btnToggleSelect) {
 }
 
 // 3. 3D Splatting rendering adjustments
+// 3. 3D Splatting rendering adjustments
 if (btnToggleSplatting) {
     btnToggleSplatting.addEventListener('click', () => {
+        if (viewer && viewer.initialized && viewer.splatRenderReady) {
+            // For Gaussian Splatting, toggle between point cloud mode and standard splat mode
+            const splatMesh = viewer.splatMesh;
+            const isPointCloud = !splatMesh.getPointCloudModeEnabled();
+            splatMesh.setPointCloudModeEnabled(isPointCloud);
+            btnToggleSplatting.textContent = `[3D Splatting: Mode ${isPointCloud ? 'POINT CLOUD' : 'DENSE SPLAT'}]`;
+            console.log(`%c[VECTRA] Gaussian splat mode toggled: ${isPointCloud ? 'Point Cloud' : 'Dense Splat'}`, 'color: #00f3ff');
+            viewer.forceRenderNextFrame();
+            return;
+        }
+
         if (!loadedModel) return;
 
         if (loadedModel.isPoints) {
@@ -788,7 +1134,16 @@ if (terminalInput) {
                     logToTerminal('Available Protocols:', 'info');
                     logToTerminal(' - upload  : Initialize custom .ply cloud upload', 'info');
                     logToTerminal(' - creator : Trigger Text-to-3D spatial diffusion', 'info');
+                    logToTerminal(' - scale <val> : Set splatScale multiplier (e.g. scale 0.05)', 'info');
                     logToTerminal(' - clear   : Flush neural terminal console buffer', 'info');
+                } else if (query.startsWith('scale ')) {
+                    const newScale = parseFloat(query.split(' ')[1]);
+                    if (!isNaN(newScale)) {
+                        window.VECTRA_SPLAT_SCALE = newScale;
+                        logToTerminal(`Splat scale multiplier set to: ${newScale}. Re-upload/inject PLY to apply.`, 'success');
+                    } else {
+                        logToTerminal('SYS_ERR: Invalid scale value. Use e.g. "scale 0.05"', 'error');
+                    }
                 } else if (query === 'upload' || query === 'protocol 1') {
                     btnUploadFile.click();
                 } else if (query === 'extract' || query === 'protocol 3') {
@@ -1230,8 +1585,19 @@ if (selectionCanvas) {
         // ── Screenshot: capture the 3D canvas within selection bounds ──────
         captureSelectionSnapshot(boundingBox);
 
-        // ── DBSE Hook: placeholder for Gaussian splat filtering ────────────
-        hideSplatsInSelection(boundingBox);
+        // ── DBSE Hook: filter Gaussian splats or points ────────────────────
+        if (viewer && viewer.initialized && viewer.splatRenderReady) {
+            const indices = findSplatIndicesInBox(x, y, w, h);
+            if (indices.length > 0) {
+                logToTerminal(`Isolating ${indices.length.toLocaleString()} splat nodes within volume...`, 'info');
+                updateSplatAlphas(indices, 0); // Hide splats (opacity = 0)
+                logToTerminal(`Excavation complete. ${indices.length.toLocaleString()} nodes dissolved.`, 'success');
+            } else {
+                logToTerminal(`No splats detected within volume.`, 'info');
+            }
+        } else {
+            hideSplatsInSelection(boundingBox);
+        }
     });
 
     // Cancel draw if mouse leaves the overlay area entirely
@@ -1447,4 +1813,75 @@ function hideSplatsInSelection(boundingBox) {
         `%c [DBSE] Complete: ${hiddenCount} of ${total} points (${pct}%) within selection box. `,
         'color: #39ff14; font-weight: bold; background: #050f08; padding: 4px 10px; border-left: 3px solid #39ff14;'
     );
+}
+
+// --- Splat Index Extraction & Visibility Modification Functions ---
+function findSplatIndicesInBox(x, y, w, h) {
+    if (!viewer || !viewer.splatMesh) return [];
+
+    const splatMesh = viewer.splatMesh;
+    const splatCount = splatMesh.getSplatCount(true);
+    const baseData = splatMesh.splatDataTextures.baseData;
+    if (!baseData || !baseData.centers) return [];
+
+    const centers = baseData.centers;
+    const selectedIndices = [];
+
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    const xMin = x;
+    const xMax = x + w;
+    const yMin = y;
+    const yMax = y + h;
+
+    // Project points from 3D world space to 2D NDC and filter by selection bounding box
+    const modelViewProjectionMatrix = new THREE.Matrix4();
+    modelViewProjectionMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    modelViewProjectionMatrix.multiply(splatMesh.matrixWorld);
+
+    const e = modelViewProjectionMatrix.elements;
+
+    for (let i = 0; i < splatCount; i++) {
+        const cx = centers[i * 3];
+        const cy = centers[i * 3 + 1];
+        const cz = centers[i * 3 + 2];
+
+        const w_coord = e[3] * cx + e[7] * cy + e[11] * cz + e[15];
+        if (w_coord <= 0) continue;
+
+        const px = (e[0] * cx + e[4] * cy + e[8] * cz + e[12]) / w_coord;
+        const py = (e[1] * cx + e[5] * cy + e[9] * cz + e[13]) / w_coord;
+        const pz = (e[2] * cx + e[6] * cy + e[10] * cz + e[14]) / w_coord;
+
+        if (pz < -1 || pz > 1) continue;
+
+        const screenX = ((px + 1) * width) / 2;
+        const screenY = ((-py + 1) * height) / 2;
+
+        if (screenX >= xMin && screenX <= xMax && screenY >= yMin && screenY <= yMax) {
+            selectedIndices.push(i);
+        }
+    }
+
+    return selectedIndices;
+}
+
+function updateSplatAlphas(selectedIndices, alphaValue) {
+    if (!viewer || !viewer.splatMesh) return;
+    const splatMesh = viewer.splatMesh;
+    const baseData = splatMesh.splatDataTextures.baseData;
+    if (!baseData || !baseData.colors) return;
+
+    const colors = baseData.colors;
+    const val = alphaValue <= 1.0 ? Math.round(alphaValue * 255) : Math.round(alphaValue);
+    for (let i = 0; i < selectedIndices.length; i++) {
+        const idx = selectedIndices[i];
+        colors[idx * 4 + 3] = val; // Set the A channel
+    }
+
+    const splatCount = splatMesh.getSplatCount(true);
+    // Push updated CPU color buffer arrays into GPU texture buffers
+    splatMesh.updateDataTexturesFromBaseData(0, splatCount - 1);
+    viewer.forceRenderNextFrame();
 }
