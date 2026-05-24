@@ -1,3 +1,170 @@
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+    --color-bg-dark: #050508;
+    --color-neon-cyan: #00f3ff;
+    --color-neon-magenta: #ff00ff;
+    --color-neon-green: #39ff14;
+    --color-glass-bg: rgba(5, 8, 15, 0.65);
+    --color-glass-border: rgba(0, 243, 255, 0.2);
+    --color-glass-border-magenta: rgba(255, 0, 255, 0.2);
+}
+
+body {
+    background-color: var(--color-bg-dark);
+    color: var(--color-neon-cyan);
+    font-family: 'Share Tech Mono', 'Courier New', Courier, monospace;
+    margin: 0;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* Custom Scanlines Overlay */
+.scanlines::before {
+    content: " ";
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0),
+        rgba(255, 255, 255, 0) 50%,
+        rgba(0, 0, 0, 0.15) 50%,
+        rgba(0, 0, 0, 0.15)
+    );
+    background-size: 100% 4px;
+    z-index: 100;
+    pointer-events: none;
+}
+
+/* Cyber-Glassmorphism UI Containers */
+.cyber-glass {
+    background: var(--color-glass-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--color-glass-border);
+    box-shadow: 0 0 15px rgba(0, 243, 255, 0.05), inset 0 0 15px rgba(0, 243, 255, 0.03);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cyber-glass-magenta {
+    background: var(--color-glass-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--color-glass-border-magenta);
+    box-shadow: 0 0 15px rgba(255, 0, 255, 0.05), inset 0 0 15px rgba(255, 0, 255, 0.03);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cyber-glass:hover {
+    border-color: rgba(0, 243, 255, 0.4);
+    box-shadow: 0 0 25px rgba(0, 243, 255, 0.15), inset 0 0 25px rgba(0, 243, 255, 0.05);
+}
+
+/* Typography & Glow Utilities */
+.text-glow-cyan {
+    color: var(--color-neon-cyan);
+    text-shadow: 0 0 5px var(--color-neon-cyan), 0 0 12px rgba(0, 243, 255, 0.5);
+}
+
+.text-glow-magenta {
+    color: var(--color-neon-magenta);
+    text-shadow: 0 0 5px var(--color-neon-magenta), 0 0 12px rgba(255, 0, 255, 0.5);
+}
+
+.text-glow-green {
+    color: var(--color-neon-green);
+    text-shadow: 0 0 5px var(--color-neon-green), 0 0 12px rgba(57, 255, 20, 0.5);
+}
+
+/* Glowing Neon Buttons */
+.btn-cyber-cyan {
+    background: rgba(0, 243, 255, 0.05);
+    border: 1px solid var(--color-neon-cyan);
+    color: var(--color-neon-cyan);
+    text-shadow: 0 0 4px var(--color-neon-cyan);
+    box-shadow: 0 0 10px rgba(0, 243, 255, 0.1), inset 0 0 10px rgba(0, 243, 255, 0.1);
+    transition: all 0.2s ease-in-out;
+}
+
+.btn-cyber-cyan:hover {
+    background: rgba(0, 243, 255, 0.2);
+    box-shadow: 0 0 20px rgba(0, 243, 255, 0.4), inset 0 0 15px rgba(0, 243, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+.btn-cyber-cyan:active {
+    transform: translateY(1px);
+}
+
+.btn-cyber-magenta {
+    background: rgba(255, 0, 255, 0.05);
+    border: 1px solid var(--color-neon-magenta);
+    color: var(--color-neon-magenta);
+    text-shadow: 0 0 4px var(--color-neon-magenta);
+    box-shadow: 0 0 10px rgba(255, 0, 255, 0.1), inset 0 0 10px rgba(255, 0, 255, 0.1);
+    transition: all 0.2s ease-in-out;
+}
+
+.btn-cyber-magenta:hover {
+    background: rgba(255, 0, 255, 0.2);
+    box-shadow: 0 0 20px rgba(255, 0, 255, 0.4), inset 0 0 15px rgba(255, 0, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+.btn-cyber-magenta:active {
+    transform: translateY(1px);
+}
+
+/* Chatbot/Terminal Utilities */
+.terminal-output {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-neon-cyan) rgba(0, 243, 255, 0.05);
+}
+
+.terminal-output::-webkit-scrollbar {
+    width: 4px;
+}
+
+.terminal-output::-webkit-scrollbar-track {
+    background: rgba(0, 243, 255, 0.02);
+}
+
+.terminal-output::-webkit-scrollbar-thumb {
+    background: var(--color-neon-cyan);
+    border-radius: 2px;
+}
+
+.terminal-input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--color-neon-cyan);
+    width: 100%;
+    font-family: inherit;
+}
+
+/* Cyber Grid Background Scanlines effect */
+@keyframes cyber-scan {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(100%); }
+}
+
+.cyber-scanner-line {
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--color-neon-cyan), transparent);
+    position: absolute;
+    top: 0;
+    left: 0;
+    opacity: 0.7;
+    animation: cyber-scan 4s linear infinite;
+    pointer-events: none;
+}

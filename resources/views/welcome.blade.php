@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VECTRA // Spatial Neural Core</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    <!-- Load compiled stylesheets and JS via Vite -->
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+</head>
+
+<body class="scanlines relative min-h-screen w-full overflow-hidden select-none bg-black">
+
+    <!-- Fixed Full-Screen Canvas for Three.js 3D Scanned Hallway Background -->
+    <canvas id="vectra-canvas" class="fixed inset-0 w-full h-full block z-0 outline-none"></canvas>
+
+    <!-- Floating Cyberpunk Bento Grid Overlay (pointer-events-none to pass click events to Three.js canvas where empty) -->
+    <main
+        class="relative z-10 w-full min-h-screen p-4 md:p-6 flex flex-col md:grid md:grid-cols-4 md:grid-rows-6 gap-4 pointer-events-none">
+
+        <!-- ROW 1: HEADER PANEL -->
+        <header
+            class="col-span-4 cyber-glass p-4 flex justify-between items-center rounded pointer-events-auto border-b border-cyan-900/50">
+            <div class="flex items-center gap-3">
+                <div class="w-3 h-3 bg-cyan-400 rounded-full animate-ping"></div>
+                <h1 class="text-glow-cyan font-bold tracking-widest text-lg md:text-xl">VECTRA // SPATIAL_CORE</h1>
+            </div>
+            <div class="flex items-center gap-6 text-xs text-cyan-500">
+                <span class="hidden md:inline font-mono">SYS_STATUS: <span
+                        class="text-glow-green text-green-400">ACTIVE</span></span>
+                <span class="font-mono">NEURAL_LINK: <span
+                        class="text-glow-cyan text-cyan-400">SYNCHRONIZED</span></span>
+                <span class="font-mono bg-cyan-950/50 border border-cyan-700/50 px-2 py-1 rounded">V_1.0.4-NEURAL</span>
+            </div>
+        </header>
+
+        <!-- ROW 2-3: TELEMETRY & SYSTEM MONITOR (LEFT COLUMN) -->
+        <section class="col-span-1 row-span-4 flex flex-col gap-4">
+
+            <!-- Diagnostics Panel -->
+            <article class="flex-1 cyber-glass p-4 rounded flex flex-col pointer-events-auto relative overflow-hidden">
+                <div class="cyber-scanner-line"></div>
+                <header class="border-b border-cyan-900/50 pb-2 mb-3">
+                    <span class="text-glow-cyan font-semibold text-xs tracking-wider">01 // SYS_DIAGNOSTICS</span>
+                </header>
+                <div class="flex-1 flex flex-col justify-between font-mono text-xs text-cyan-400 space-y-2">
+                    <div class="flex justify-between">
+                        <span>SYS.LOAD:</span>
+                        <span class="text-glow-cyan">18.42%</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>GPU_TEMP:</span>
+                        <span class="text-glow-magenta text-fuchsia-400">62°C</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>VRAM_ALLOC:</span>
+                        <span>4.2GB / 8GB</span>
+                    </div>
+                    <div class="w-full bg-cyan-950/50 h-1.5 rounded-full overflow-hidden border border-cyan-900/50">
+                        <div class="bg-cyan-400 h-full w-[52%] shadow-[0_0_8px_#00f3ff]"></div>
+                    </div>
+                    <div class="flex justify-between pt-2 border-t border-cyan-900/30">
+                        <span>DB_UPLINK:</span>
+                        <span class="text-glow-green text-green-400">ONLINE</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>LATENCY:</span>
+                        <span class="text-glow-cyan">12ms</span>
+                    </div>
+                </div>
+            </article>
+
+            <!-- Anchor Matrix Panel -->
+            <article
+                class="flex-1 cyber-glass-magenta p-4 rounded flex flex-col pointer-events-auto relative overflow-hidden">
+                <header class="border-b border-fuchsia-900/50 pb-2 mb-3">
+                    <span class="text-glow-magenta font-semibold text-xs tracking-wider">02 // ANCHOR_MATRIX</span>
+                </header>
+                <div class="flex-1 flex flex-col justify-between font-mono text-xs text-fuchsia-400 space-y-2">
+                    <div class="flex justify-between">
+                        <span>ACTIVE_NODES:</span>
+                        <span class="text-glow-magenta">147</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>SCAN_ACCURACY:</span>
+                        <span>98.6%</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>MESH_SPLICES:</span>
+                        <span>12 OK</span>
+                    </div>
+                    <div
+                        class="w-full bg-fuchsia-950/50 h-1.5 rounded-full overflow-hidden border border-fuchsia-900/50">
+                        <div class="bg-fuchsia-400 h-full w-[84%] shadow-[0_0_8px_#ff00ff]"></div>
+                    </div>
+                    <div class="flex justify-between pt-2 border-t border-fuchsia-900/30">
+                        <span>GRID_DRIFT:</span>
+                        <span>&lt; 0.002mm</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>COORDS_LOCK:</span>
+                        <span class="text-glow-magenta">TRUE</span>
+                    </div>
+                </div>
+            </article>
+
+        </section>
+
+        <!-- ROW 2-3: HOLOGRAPHIC SCANNER INDICATION CONTAINER (MIDDLE COLUMNS) -->
+        <section
+            class="col-span-2 row-span-4 cyber-glass p-4 rounded flex flex-col justify-between pointer-events-auto border border-cyan-900/20 md:min-h-0 min-h-[250px]">
+            <header class="flex justify-between items-center border-b border-cyan-900/50 pb-2 mb-3">
+                <span class="text-glow-cyan font-semibold text-xs tracking-wider">03 // VIEWPORT_TELEMETRY</span>
+                <span
+                    class="text-glow-green text-[10px] bg-green-950/50 px-2 py-0.5 border border-green-700/50 rounded uppercase">3D
+                    Grid Active</span>
+            </header>
+            <div
+                class="flex-1 flex flex-col justify-center items-center font-mono text-xs text-cyan-600 gap-2 border border-dashed border-cyan-950 rounded p-6">
+                <span class="text-center">DRAG TO ROTATE SCENARIO MESH ENVIRONMENT</span>
+                <div class="text-[10px] text-cyan-800 text-center uppercase tracking-widest mt-1">
+                    Hold Left Click + Drag // Use Scroll Wheel to Zoom
+                </div>
+            </div>
+            <div
+                class="flex justify-between items-center mt-3 pt-2 border-t border-cyan-900/30 text-[10px] font-mono text-cyan-500">
+                <span>ROT_X: <span id="telemetry-rot-x">0.00</span></span>
+                <span>ROT_Y: <span id="telemetry-rot-y">0.00</span></span>
+                <span>GRID_DIVS: 30</span>
+            </div>
+        </section>
+
+        <!-- ROW 2-5: AI CO-PILOT TERMINAL PANEL (RIGHT COLUMN) -->
+        <aside
+            class="col-span-1 row-span-5 cyber-glass p-4 rounded flex flex-col justify-between pointer-events-auto border border-cyan-900/50 md:min-h-0 min-h-[400px]">
+            <header class="border-b border-cyan-900/50 pb-2 mb-3 flex justify-between items-center">
+                <span class="text-glow-cyan font-semibold text-xs tracking-wider">04 // AI.CO-PILOT_LINK</span>
+                <span class="w-2 h-2 bg-green-400 rounded-full shadow-[0_0_6px_#39ff14]"></span>
+            </header>
+
+            <!-- Terminal Output Area -->
+            <div id="terminal-output"
+                class="flex-grow overflow-y-auto mb-4 font-mono text-xs flex flex-col gap-2 p-2 bg-black/45 rounded border border-cyan-950/70 terminal-output h-48 md:h-auto">
+                <div class="text-glow-green">> Neural Link initialized.</div>
+                <div class="text-cyan-500">> System status: ONLINE.</div>
+                <div class="text-cyan-500">> Select protocol to initialize neural stream.</div>
+            </div>
+
+            <!-- Glowing Toggle Buttons -->
+            <div class="flex flex-col gap-3 mb-4">
+                <button id="btn-extract-mode"
+                    class="btn-cyber-cyan w-full py-3 rounded font-semibold text-xs uppercase tracking-widest focus:outline-none">
+                    [Extract Mode]
+                </button>
+                <div class="text-[10px] font-mono text-cyan-600 text-center -mt-2.5 mb-1">Image-to-3D Protocol</div>
+
+                <button id="btn-creator-mode"
+                    class="btn-cyber-magenta w-full py-3 rounded font-semibold text-xs uppercase tracking-widest focus:outline-none">
+                    [Creator Mode]
+                </button>
+                <div class="text-[10px] font-mono text-fuchsia-600 text-center -mt-2.5">Text-to-3D Protocol</div>
+            </div>
+
+            <!-- Terminal Input Form -->
+            <div class="border-t border-cyan-900/50 pt-3 flex items-center gap-2">
+                <span class="text-glow-cyan font-mono font-bold">></span>
+                <input type="text" id="terminal-input" class="terminal-input font-mono text-xs"
+                    placeholder="Type prompt/command..." autocomplete="off">
+            </div>
+        </aside>
+
+        <!-- ROW 6: FOOTER INFORMATION -->
+        <footer
+            class="col-span-3 cyber-glass px-4 py-2 rounded flex justify-between items-center pointer-events-auto text-[10px] font-mono text-cyan-600 border border-cyan-950">
+            <span>UPLINK ID: SC_8829-19</span>
+            <span>CELL_MATRIX: 256x256</span>
+            <span>VOLTAGE: 1.25V // CURRENT: 3.42A</span>
+        </footer>
+
+    </main>
+
+</body>
+
+</html>
