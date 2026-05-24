@@ -150,17 +150,11 @@
 
             <!-- Glowing Toggle Buttons -->
             <div class="flex flex-col gap-3 mb-4">
-                <button id="btn-extract-mode"
-                    class="btn-cyber-cyan w-full py-3 rounded font-semibold text-xs uppercase tracking-widest focus:outline-none">
-                    [Extract Mode]
-                </button>
-                <div class="text-[10px] font-mono text-cyan-600 text-center -mt-2.5 mb-2">Image-to-3D Protocol</div>
-
                 <button id="btn-upload-file"
-                    class="btn-cyber-cyan w-full py-3 rounded font-semibold text-xs uppercase tracking-widest focus:outline-none border-dashed border-2">
-                    [Upload PLY Model]
+                    class="btn-cyber-cyan w-full py-3 rounded font-semibold text-xs uppercase tracking-widest focus:outline-none">
+                    [INJECT SPATIAL SCAN]
                 </button>
-                <div class="text-[10px] font-mono text-cyan-600 text-center -mt-2.5 mb-2">Local File (drag/drop)</div>
+                <div class="text-[10px] font-mono text-cyan-600 text-center -mt-2.5 mb-2">Local PLY / GZ Stream</div>
 
                 <button id="btn-creator-mode"
                     class="btn-cyber-magenta w-full py-3 rounded font-semibold text-xs uppercase tracking-widest focus:outline-none">

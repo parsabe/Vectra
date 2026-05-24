@@ -5,12 +5,11 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
 
 // --- System Telemetry DOM Elements ---
-window.VECTRA_VERSION = "1.0.6-NEURAL-CB-105";
+window.VECTRA_VERSION = "1.0.7-NEURAL-CB-106";
 const telemetryRotX = document.getElementById('telemetry-rot-x');
 const telemetryRotY = document.getElementById('telemetry-rot-y');
 const terminalOutput = document.getElementById('terminal-output');
 const terminalInput = document.getElementById('terminal-input');
-const btnExtract = document.getElementById('btn-extract-mode');
 const btnCreator = document.getElementById('btn-creator-mode');
 
 // --- Splat Mode UI Elements ---
@@ -676,14 +675,6 @@ if (btnToggleSplatting) {
 }
 
 // --- Main Menu Buttons binding ---
-if (btnExtract) {
-    btnExtract.addEventListener('click', () => {
-        logConsoleSystem(1, 'Extract Mode');
-        logToTerminal('Protocol 1 Initiated: Extract Mode...', 'info');
-        loadPLYModel('/files/point_cloud_optimized.ply.gz');
-    });
-}
-
 if (btnCreator) {
     btnCreator.addEventListener('click', () => {
         logConsoleSystem(2, 'Creator Mode');
@@ -706,11 +697,11 @@ if (terminalInput) {
                 const query = inputVal.toLowerCase();
                 if (query === 'help') {
                     logToTerminal('Available Protocols:', 'info');
-                    logToTerminal(' - extract : Initialize .ply cloud data load', 'info');
+                    logToTerminal(' - upload  : Initialize custom .ply cloud upload', 'info');
                     logToTerminal(' - creator : Trigger Text-to-3D spatial diffusion', 'info');
                     logToTerminal(' - clear   : Flush neural terminal console buffer', 'info');
-                } else if (query === 'extract' || query === 'protocol 1') {
-                    btnExtract.click();
+                } else if (query === 'upload' || query === 'extract' || query === 'protocol 1') {
+                    btnUploadFile.click();
                 } else if (query === 'creator' || query === 'protocol 2') {
                     btnCreator.click();
                 } else if (query === 'clear') {
