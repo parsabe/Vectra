@@ -168,3 +168,138 @@ body {
     animation: cyber-scan 4s linear infinite;
     pointer-events: none;
 }
+
+/* ══════════════════════════════════════════════════════════
+   EXTRACT MODE — Green Glassmorphism + Fade Transitions
+   ══════════════════════════════════════════════════════════ */
+
+:root {
+    --color-neon-green-extract: #39ff14;
+    --color-glass-border-green: rgba(57, 255, 20, 0.25);
+    --color-neon-red: #ff2d55;
+}
+
+/* Green-tinted glassmorphic panel for Extract toolbar */
+.cyber-glass-green {
+    background: rgba(5, 15, 8, 0.72);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--color-glass-border-green);
+    box-shadow:
+        0 0 20px rgba(57, 255, 20, 0.08),
+        inset 0 0 20px rgba(57, 255, 20, 0.04),
+        0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+/* ── Fade utilities for Main UI ── */
+/* When Extract mode activates, main bento grid fades out */
+.ui-fade-out {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* CRITICAL: also kill pointer-events on ALL children.
+   The <main> has pointer-events-none but individual child buttons have
+   pointer-events-auto which overrides the parent. This cascades the kill
+   to every descendant so invisible buttons don't eat mouse events during fade. */
+.ui-fade-out * {
+    pointer-events: none !important;
+}
+
+.ui-fade-in {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+
+/* ── Extract Toolbar state ── */
+/* Hidden (off-screen + invisible) = default */
+.extract-toolbar-base {
+    opacity: 0;
+    transform: translate(-50%, 24px);
+    pointer-events: none;
+    transition:
+        opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+        transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Visible (slides up + fades in) */
+.extract-toolbar-base.extract-toolbar-visible {
+    opacity: 1;
+    transform: translate(-50%, 0px);
+    pointer-events: auto !important;  /* Re-enable clicks when visible */
+    box-shadow:
+        0 0 30px rgba(57, 255, 20, 0.20),
+        0 0 60px rgba(57, 255, 20, 0.08),
+        inset 0 0 20px rgba(57, 255, 20, 0.05);
+    animation: extract-toolbar-glow 2.5s ease-in-out infinite;
+}
+
+@keyframes extract-toolbar-glow {
+    0%, 100% { box-shadow: 0 0 20px rgba(57,255,20,0.12), inset 0 0 15px rgba(57,255,20,0.04); }
+    50%       { box-shadow: 0 0 40px rgba(57,255,20,0.30), 0 0 80px rgba(57,255,20,0.10), inset 0 0 25px rgba(57,255,20,0.08); }
+}
+
+/* ── Green neon button ── */
+.btn-cyber-green {
+    background: rgba(57, 255, 20, 0.05);
+    border: 1px solid var(--color-neon-green-extract);
+    color: var(--color-neon-green-extract);
+    text-shadow: 0 0 4px var(--color-neon-green-extract);
+    box-shadow: 0 0 10px rgba(57, 255, 20, 0.1), inset 0 0 10px rgba(57, 255, 20, 0.1);
+    transition: all 0.2s ease-in-out;
+}
+
+.btn-cyber-green:hover {
+    background: rgba(57, 255, 20, 0.18);
+    box-shadow: 0 0 22px rgba(57, 255, 20, 0.45), inset 0 0 15px rgba(57, 255, 20, 0.2);
+    transform: translateY(-1px);
+}
+
+.btn-cyber-green:active {
+    transform: translateY(1px);
+}
+
+/* Active/selected state for toolbar buttons (highlights the current mode) */
+.extract-btn-active {
+    background: rgba(57, 255, 20, 0.22) !important;
+    box-shadow: 0 0 28px rgba(57, 255, 20, 0.55), inset 0 0 18px rgba(57, 255, 20, 0.25) !important;
+    border-color: var(--color-neon-green-extract) !important;
+}
+
+/* ── Red abort button ── */
+.btn-cyber-red {
+    background: rgba(255, 45, 85, 0.06);
+    border: 1px solid var(--color-neon-red);
+    color: var(--color-neon-red);
+    text-shadow: 0 0 4px var(--color-neon-red);
+    box-shadow: 0 0 10px rgba(255, 45, 85, 0.1), inset 0 0 10px rgba(255, 45, 85, 0.1);
+    transition: all 0.2s ease-in-out;
+}
+
+.btn-cyber-red:hover {
+    background: rgba(255, 45, 85, 0.22);
+    box-shadow: 0 0 22px rgba(255, 45, 85, 0.5), inset 0 0 15px rgba(255, 45, 85, 0.22);
+    transform: translateY(-1px);
+}
+
+.btn-cyber-red:active {
+    transform: translateY(1px);
+}
+
+/* ── Selection Canvas cursor ── */
+#selection-canvas.select-drawing-mode {
+    cursor: crosshair !important;
+}
+
+/* Subtle pulsing glow on the selection canvas when active */
+@keyframes selection-canvas-pulse {
+    0%, 100% { box-shadow: inset 0 0 0px rgba(57, 255, 20, 0); }
+    50%       { box-shadow: inset 0 0 20px rgba(57, 255, 20, 0.08); }
+}
+
+#selection-canvas.select-drawing-mode {
+    animation: selection-canvas-pulse 2s ease-in-out infinite;
+}

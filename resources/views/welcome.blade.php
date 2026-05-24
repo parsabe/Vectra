@@ -162,6 +162,12 @@
                 </button>
                 <div class="text-[10px] font-mono text-fuchsia-600 text-center -mt-2.5">Text-to-3D Protocol</div>
 
+                <button id="btn-extract-mode"
+                    class="btn-cyber-green w-full py-3 rounded font-semibold text-xs uppercase tracking-widest focus:outline-none mt-1">
+                    [Extract Mode]
+                </button>
+                <div class="text-[10px] font-mono text-green-600 text-center -mt-2.5">Image-to-3D Protocol</div>
+
                 <!-- Hidden local file input -->
                 <input type="file" id="file-uploader" accept=".ply,.ply.gz,.gz" class="hidden">
             </div>
@@ -185,32 +191,123 @@
     </main>
 
     <!-- Splat Toolbar: Displayed in full-screen splat mode -->
-    <div id="splat-toolbar" class="fixed top-6 left-1/2 -translate-x-1/2 z-20 pointer-events-auto cyber-glass px-6 py-3 rounded-full flex gap-4 md:gap-6 items-center hidden border border-cyan-500/30">
-        <span class="text-glow-cyan font-bold tracking-widest text-[10px] md:text-xs font-mono uppercase">VECTRA // SPLAT_VIEWER</span>
+    <div id="splat-toolbar"
+        class="fixed top-6 left-1/2 -translate-x-1/2 z-20 pointer-events-auto cyber-glass px-6 py-3 rounded-full flex gap-4 md:gap-6 items-center hidden border border-cyan-500/30">
+        <span class="text-glow-cyan font-bold tracking-widest text-[10px] md:text-xs font-mono uppercase">VECTRA //
+            SPLAT_VIEWER</span>
         <div class="h-4 w-px bg-cyan-900/60"></div>
-        <button id="btn-back-menu" class="btn-cyber-cyan px-3 py-1.5 rounded text-[9px] md:text-[10px] uppercase font-semibold tracking-wider focus:outline-none">
+        <button id="btn-back-menu"
+            class="btn-cyber-cyan px-3 py-1.5 rounded text-[9px] md:text-[10px] uppercase font-semibold tracking-wider focus:outline-none">
             [Back to Menu]
         </button>
-        <button id="btn-toggle-select" class="btn-cyber-cyan px-3 py-1.5 rounded text-[9px] md:text-[10px] uppercase font-semibold tracking-wider focus:outline-none">
+        <button id="btn-toggle-select"
+            class="btn-cyber-cyan px-3 py-1.5 rounded text-[9px] md:text-[10px] uppercase font-semibold tracking-wider focus:outline-none">
             [Select Objects: OFF]
         </button>
-        <button id="btn-toggle-splatting" class="btn-cyber-cyan px-3 py-1.5 rounded text-[9px] md:text-[10px] uppercase font-semibold tracking-wider focus:outline-none">
+        <button id="btn-toggle-splatting"
+            class="btn-cyber-cyan px-3 py-1.5 rounded text-[9px] md:text-[10px] uppercase font-semibold tracking-wider focus:outline-none">
             [3D Splatting: Point Size 0.06]
         </button>
     </div>
 
+    <!-- ═══════════════════════════════════════════════════════
+         EXTRACT MODE: Minimal Floating Toolbar (bottom-center)
+         Fades in when user clicks [Extract Mode] button.
+    ═══════════════════════════════════════════════════════ -->
+    <div id="extract-toolbar" class="extract-toolbar-base fixed bottom-8 left-1/2 -translate-x-1/2 z-[25] pointer-events-none
+               cyber-glass-green px-8 py-5 rounded-2xl flex gap-5 md:gap-7 items-center
+               border border-green-500/40" aria-label="Extract Mode Controls" role="toolbar">
+
+        <!-- Glowing label -->
+        <div class="flex flex-col items-start gap-0.5 mr-2">
+            <span
+                class="text-glow-green font-bold tracking-widest text-[9px] md:text-[11px] font-mono uppercase">EXTRACT
+                // DBSE</span>
+            <span id="extract-mode-status" class="text-[8px] font-mono text-green-600 tracking-wider">ORBIT MODE
+                ACTIVE</span>
+        </div>
+
+        <div class="h-8 w-px bg-green-900/60"></div>
+
+        <!-- Button 1: Abort (Back to Main) -->
+        <button id="btn-extract-abort"
+            class="btn-cyber-red px-4 py-2 rounded-lg text-[10px] md:text-xs uppercase font-semibold tracking-wider focus:outline-none"
+            aria-label="Abort Extract Mode">
+            &#x2715; ABORT
+        </button>
+
+        <!-- Button 2: Orbit Mode -->
+        <button id="btn-extract-orbit"
+            class="btn-cyber-green extract-btn-active px-4 py-2 rounded-lg text-[10px] md:text-xs uppercase font-semibold tracking-wider focus:outline-none"
+            aria-label="Activate Orbit Camera Mode">
+            &#x21BA; ORBIT
+        </button>
+
+        <!-- Button 3: Select / Extract -->
+        <button id="btn-extract-select"
+            class="btn-cyber-green px-4 py-2 rounded-lg text-[10px] md:text-xs uppercase font-semibold tracking-wider focus:outline-none"
+            aria-label="Activate Selection Bounding Box Mode">
+            &#x25A3; SELECT
+        </button>
+    </div>
+
+    <!-- 2D Bounding-Box Selection Canvas Overlay (injected over the 3D canvas) -->
+    <!-- This element is shown/hidden by JS; it sits directly above vectra-canvas -->
+    <canvas id="selection-canvas" class="fixed inset-0 w-full h-full z-10 pointer-events-none" aria-hidden="true">
+    </canvas>
+
+    <!-- ════════════════════════════════════════════════
+         EXTRACT MODE HUD — top-right corner readout
+    ════════════════════════════════════════════════ -->
+    <div id="extract-hud" class="hidden fixed top-6 right-6 z-[24] pointer-events-none
+               cyber-glass-green px-5 py-3 rounded-xl border border-green-500/30
+               font-mono text-[10px] flex flex-col gap-1.5" aria-live="polite" aria-label="Extract Mode telemetry">
+
+        <!-- Title row -->
+        <div class="flex items-center gap-2 border-b border-green-900/50 pb-1 mb-0.5">
+            <span class="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse shadow-[0_0_6px_#39ff14]"></span>
+            <span class="text-glow-green tracking-widest uppercase text-[9px]">DBSE // EXTRACT MODE</span>
+        </div>
+
+        <!-- Camera coordinates -->
+        <div class="flex flex-col gap-0.5">
+            <span class="text-green-700 uppercase tracking-wider text-[8px]">CAM_POS</span>
+            <span id="extract-hud-coords" class="text-glow-green text-[11px]">X:0.00 Y:0.00 Z:0.00</span>
+        </div>
+
+        <!-- FPS & controls hint -->
+        <div class="flex justify-between items-center border-t border-green-900/30 pt-1 mt-0.5 gap-4">
+            <span id="extract-hud-fps" class="text-green-500">-- FPS</span>
+            <span class="text-green-800 text-[8px] uppercase tracking-wider">WASD • Q/E • SHIFT+WASD</span>
+        </div>
+
+        <!-- Key legend -->
+        <div class="flex flex-wrap gap-x-3 gap-y-0.5 border-t border-green-900/20 pt-1">
+            <span class="text-green-800 text-[8px]">W/S – Fwd/Back</span>
+            <span class="text-green-800 text-[8px]">A/D – Strafe</span>
+            <span class="text-green-800 text-[8px]">Q/E – Up/Down</span>
+            <span class="text-green-800 text-[8px]">SHIFT – Sprint</span>
+        </div>
+    </div>
+
     <!-- Loading Overlay for 3D PLY load progress -->
-    <div id="loading-overlay" class="fixed inset-0 z-30 bg-black/90 flex flex-col justify-center items-center gap-4 hidden pointer-events-auto font-mono text-xs text-cyan-400">
-        <div class="w-12 h-12 border-2 border-t-cyan-400 border-r-transparent border-b-cyan-400 border-l-transparent rounded-full animate-spin shadow-[0_0_15px_rgba(0,243,255,0.3)]"></div>
-        <div id="loading-text" class="text-glow-cyan uppercase tracking-widest mt-2 text-center px-4">Initializing Neural Extraction...</div>
+    <div id="loading-overlay"
+        class="fixed inset-0 z-30 bg-black/90 flex flex-col justify-center items-center gap-4 hidden pointer-events-auto font-mono text-xs text-cyan-400">
+        <div
+            class="w-12 h-12 border-2 border-t-cyan-400 border-r-transparent border-b-cyan-400 border-l-transparent rounded-full animate-spin shadow-[0_0_15px_rgba(0,243,255,0.3)]">
+        </div>
+        <div id="loading-text" class="text-glow-cyan uppercase tracking-widest mt-2 text-center px-4">Initializing
+            Neural Extraction...</div>
         <div class="w-64 bg-cyan-950/40 h-2 rounded-full overflow-hidden border border-cyan-700/30">
-            <div id="loading-bar-fill" class="bg-cyan-400 h-full w-[0%] transition-all duration-100 shadow-[0_0_8px_#00f3ff]"></div>
+            <div id="loading-bar-fill"
+                class="bg-cyan-400 h-full w-[0%] transition-all duration-100 shadow-[0_0_8px_#00f3ff]"></div>
         </div>
         <div id="loading-percent" class="text-[10px] text-cyan-500">0% Loaded</div>
     </div>
 
     <!-- Drag & Drop Interactive Overlay -->
-    <div id="drop-zone-overlay" class="fixed inset-0 z-40 bg-black/85 border-4 border-dashed border-cyan-400 flex flex-col justify-center items-center gap-4 hidden pointer-events-none font-mono text-cyan-400">
+    <div id="drop-zone-overlay"
+        class="fixed inset-0 z-40 bg-black/85 border-4 border-dashed border-cyan-400 flex flex-col justify-center items-center gap-4 hidden pointer-events-none font-mono text-cyan-400">
         <div class="text-glow-cyan text-lg md:text-xl uppercase tracking-widest font-bold text-center px-6">
             [DROP PLY FILE HERE TO INITIALIZE NEURAL STREAM]
         </div>

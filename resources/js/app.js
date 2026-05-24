@@ -45,7 +45,8 @@ camera.position.set(0, 3, 10);
 const renderer = new THREE.WebGLRenderer({
     canvas: canvas,
     antialias: true,
-    alpha: false
+    alpha: false,
+    preserveDrawingBuffer: true  // Required for toDataURL() screenshot capture
 });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -141,6 +142,91 @@ controls.minDistance = 1;
 controls.maxDistance = 50;
 controls.target.set(0, 0.5, 0);
 
+// ── WASD + QE Keyboard Movement (6DoF fly-through) ──────────────────────────
+// Active in both main mode and Extract Orbit mode
+const keysDown = {};
+const MOVE_SPEED      = 0.12;  // Base movement speed per frame
+const MOVE_SPRINT     = 0.38;  // Shift-held sprint speed
+const MOVE_SMOOTH     = 0.88;  // Velocity decay factor (higher = glider feel)
+const moveVelocity    = new THREE.Vector3();
+const tmpDir          = new THREE.Vector3();
+const tmpRight        = new THREE.Vector3();
+const tmpUp           = new THREE.Vector3(0, 1, 0);
+
+document.addEventListener('keydown', (e) => {
+    // Ignore if user is typing in terminal input
+    if (document.activeElement === terminalInput) return;
+    keysDown[e.code] = true;
+});
+document.addEventListener('keyup', (e) => {
+    keysDown[e.code] = false;
+});
+
+function applyWASDMovement() {
+    // Only move camera when orbit controls are enabled (no bbox drawing)
+    if (!controls.enabled) return;
+
+    // Check if any movement key is actually pressed
+    const anyKey = keysDown['KeyW'] || keysDown['KeyS'] || keysDown['KeyA'] || keysDown['KeyD']
+                || keysDown['KeyQ'] || keysDown['KeyE']
+                || keysDown['ArrowUp'] || keysDown['ArrowDown'] || keysDown['ArrowLeft'] || keysDown['ArrowRight']
+                || keysDown['Space'] || keysDown['ControlLeft'];
+
+    // Decay existing velocity toward zero even if no keys are held
+    moveVelocity.multiplyScalar(MOVE_SMOOTH);
+
+    // Hard-zero when negligible — prevents endless drift fighting OrbitControls
+    if (moveVelocity.lengthSq() < 1e-8) {
+        moveVelocity.set(0, 0, 0);
+    }
+
+    // NaN self-heal (triggered if camera once looked exactly straight up/down)
+    if (isNaN(moveVelocity.x) || isNaN(moveVelocity.y) || isNaN(moveVelocity.z)) {
+        moveVelocity.set(0, 0, 0);
+    }
+
+    if (!anyKey) {
+        // Apply residual glide to camera + target only if still moving
+        if (moveVelocity.lengthSq() > 0) {
+            camera.position.add(moveVelocity);
+            controls.target.add(moveVelocity);
+        }
+        return;
+    }
+
+    const speed = keysDown['ShiftLeft'] || keysDown['ShiftRight'] ? MOVE_SPRINT : MOVE_SPEED;
+
+    // Get forward direction from camera (ignore vertical component for W/S)
+    camera.getWorldDirection(tmpDir);
+    tmpDir.y = 0;
+
+    // ── NaN guard: camera pointing exactly up or down makes horizontal vector zero
+    if (tmpDir.lengthSq() < 0.0001) {
+        // Fallback: use camera's local -Z projected to XZ plane
+        tmpDir.set(-camera.matrix.elements[8], 0, -camera.matrix.elements[10]);
+        if (tmpDir.lengthSq() < 0.0001) tmpDir.set(0, 0, -1); // last resort
+    }
+    tmpDir.normalize();
+
+    // Right = cross(forward, world-up)
+    tmpRight.crossVectors(tmpDir, tmpUp).normalize();
+
+    const accel = new THREE.Vector3();
+
+    if (keysDown['KeyW'] || keysDown['ArrowUp'])     accel.addScaledVector(tmpDir,   speed);
+    if (keysDown['KeyS'] || keysDown['ArrowDown'])   accel.addScaledVector(tmpDir,  -speed);
+    if (keysDown['KeyA'] || keysDown['ArrowLeft'])   accel.addScaledVector(tmpRight, -speed);
+    if (keysDown['KeyD'] || keysDown['ArrowRight'])  accel.addScaledVector(tmpRight,  speed);
+    if (keysDown['KeyQ'] || keysDown['Space'])       accel.y +=  speed;  // Float up
+    if (keysDown['KeyE'] || keysDown['ControlLeft']) accel.y -=  speed;  // Sink down
+
+    moveVelocity.add(accel);
+
+    // Apply movement: shift camera AND orbit target by the same delta
+    camera.position.add(moveVelocity);
+    controls.target.add(moveVelocity);
+}
+
 // --- Animation Loop ---
 let clock = new THREE.Clock();
 
@@ -176,8 +262,16 @@ function animate() {
         }
     });
 
+    // Apply WASD keyboard movement every frame
+    applyWASDMovement();
+
     // Update controls
     controls.update();
+
+    // Animate Extract Mode scene effects
+    if (isExtractModeActive) {
+        animateExtractScene(elapsedTime);
+    }
 
     // Render Scene
     renderer.render(scene, camera);
@@ -187,6 +281,9 @@ function animate() {
         telemetryRotX.textContent = controls.object.rotation.x.toFixed(2);
         telemetryRotY.textContent = controls.object.rotation.y.toFixed(2);
     }
+
+    // Update Extract HUD coordinate readout
+    updateExtractHUD(elapsedTime);
 }
 
 animate();
@@ -692,8 +789,10 @@ if (terminalInput) {
                     logToTerminal(' - upload  : Initialize custom .ply cloud upload', 'info');
                     logToTerminal(' - creator : Trigger Text-to-3D spatial diffusion', 'info');
                     logToTerminal(' - clear   : Flush neural terminal console buffer', 'info');
-                } else if (query === 'upload' || query === 'extract' || query === 'protocol 1') {
+                } else if (query === 'upload' || query === 'protocol 1') {
                     btnUploadFile.click();
+                } else if (query === 'extract' || query === 'protocol 3') {
+                    btnExtractMode && btnExtractMode.click();
                 } else if (query === 'creator' || query === 'protocol 2') {
                     btnCreator.click();
                 } else if (query === 'clear') {
@@ -707,4 +806,645 @@ if (terminalInput) {
             }, 300);
         }
     });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  EXTRACT MODE — Image-to-3D Protocol (Protocol 3)
+//  SuperSplat-style bounding-box selection engine + DBSE hook
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── DOM references ──────────────────────────────────────────────────────────
+const btnExtractMode    = document.getElementById('btn-extract-mode');
+const extractToolbar    = document.getElementById('extract-toolbar');
+const btnExtractAbort   = document.getElementById('btn-extract-abort');
+const btnExtractOrbit   = document.getElementById('btn-extract-orbit');
+const btnExtractSelect  = document.getElementById('btn-extract-select');
+const extractModeStatus = document.getElementById('extract-mode-status');
+const selectionCanvas   = document.getElementById('selection-canvas');
+const extractHud        = document.getElementById('extract-hud');
+const extractHudCoords  = document.getElementById('extract-hud-coords');
+const extractHudFps     = document.getElementById('extract-hud-fps');
+
+// ── Extract Mode state ──────────────────────────────────────────────────────
+let isExtractModeActive  = false;
+let isSelectionDrawing   = false; // true = bbox draw mode, false = orbit mode
+
+// Bounding-box mouse tracking (raw client pixels)
+let selBoxStart   = { x: 0, y: 0 };
+let selBoxCurrent = { x: 0, y: 0 };
+let isMouseDown   = false;
+
+// Extract scene state
+let extractSceneOriginalFog = null;
+let extractSceneOriginalBg  = null;
+let extractFpsFrames = 0;
+let extractFpsLast   = performance.now();
+let extractFps       = 0;
+
+// ── Utility: set status label text safely ──────────────────────────────────
+function setExtractStatus(text) {
+    if (extractModeStatus) extractModeStatus.textContent = text;
+}
+
+// ── Utility: swap active highlight between Orbit and Select buttons ────────
+function setExtractActiveButton(mode) {
+    if (!btnExtractOrbit || !btnExtractSelect) return;
+    if (mode === 'orbit') {
+        btnExtractOrbit.classList.add('extract-btn-active');
+        btnExtractSelect.classList.remove('extract-btn-active');
+    } else {
+        btnExtractSelect.classList.add('extract-btn-active');
+        btnExtractOrbit.classList.remove('extract-btn-active');
+    }
+}
+
+// ── Fade helpers ────────────────────────────────────────────────────────────
+function fadeOutMainUI() {
+    if (!bentoGrid) return;
+    bentoGrid.classList.add('ui-fade-out');
+    setTimeout(() => bentoGrid.classList.add('hidden'), 460);
+}
+
+function fadeInMainUI() {
+    if (!bentoGrid) return;
+    bentoGrid.classList.remove('hidden');
+    requestAnimationFrame(() => {
+        bentoGrid.classList.remove('ui-fade-out');
+        bentoGrid.classList.add('ui-fade-in');
+        setTimeout(() => bentoGrid.classList.remove('ui-fade-in'), 460);
+    });
+}
+
+function showExtractToolbar() {
+    if (!extractToolbar) return;
+    // Force a reflow to restart the CSS transition cleanly
+    void extractToolbar.offsetHeight;
+    requestAnimationFrame(() => {
+        extractToolbar.classList.add('extract-toolbar-visible');
+    });
+}
+
+function hideExtractToolbar() {
+    if (!extractToolbar) return;
+    extractToolbar.classList.remove('extract-toolbar-visible');
+}
+
+// ── Extract Scene Animation (green tint, pulsing fog) ───────────────────────
+let extractGreenLight = null;
+function animateExtractScene(t) {
+    // Pulse a green light around the scene in Extract mode
+    if (extractGreenLight) {
+        extractGreenLight.intensity = 2.5 + Math.sin(t * 3.0) * 1.5;
+        extractGreenLight.position.x = Math.sin(t * 0.6) * 8;
+        extractGreenLight.position.z = Math.cos(t * 0.6) * 8;
+    }
+    // FPS counter
+    extractFpsFrames++;
+    const now = performance.now();
+    if (now - extractFpsLast >= 500) {
+        extractFps = Math.round(extractFpsFrames * 1000 / (now - extractFpsLast));
+        extractFpsFrames = 0;
+        extractFpsLast = now;
+    }
+}
+
+// ── Extract HUD update ───────────────────────────────────────────────────────
+function updateExtractHUD(t) {
+    if (!isExtractModeActive || !extractHud) return;
+    if (extractHudCoords) {
+        const pos = camera.position;
+        extractHudCoords.textContent =
+            `X:${pos.x.toFixed(2)} Y:${pos.y.toFixed(2)} Z:${pos.z.toFixed(2)}`;
+    }
+    if (extractHudFps) {
+        extractHudFps.textContent = `${extractFps} FPS`;
+    }
+}
+
+// ── Activate Extract Mode ───────────────────────────────────────────────────
+function activateExtractMode() {
+    if (isExtractModeActive) return;
+    isExtractModeActive = true;
+
+    logConsoleSystem(3, 'Extract Mode (Image-to-3D Protocol)');
+    logToTerminal('Protocol 3 Initiated: Extract Mode (DBSE Engine)...', 'info');
+    logToTerminal('DBSE: Spatial extraction viewport active. WASD to navigate.', 'info');
+    logToTerminal('DBSE: Click [SELECT] then drag to lock target area.', 'success');
+
+    // ── Dramatic scene transformation ──
+    // Save original scene state
+    extractSceneOriginalFog = scene.fog ? { color: scene.fog.color.clone(), density: scene.fog.density } : null;
+    extractSceneOriginalBg  = scene.background ? scene.background.clone() : null;
+
+    // Shift scene to green extraction tint
+    scene.background = new THREE.Color(0x010802);
+    scene.fog = new THREE.FogExp2(0x010802, 0.018);
+
+    // Add a sweeping green extraction light
+    extractGreenLight = new THREE.PointLight(0x39ff14, 4, 40);
+    extractGreenLight.position.set(0, 5, 0);
+    scene.add(extractGreenLight);
+
+    // Tint the grid to green
+    gridHelper.material = new THREE.LineBasicMaterial({ color: 0x39ff14, opacity: 0.4, transparent: true });
+
+    // Ensure orbit controls are ON as default entry state
+    controls.enabled = true;
+    controls.maxPolarAngle = Math.PI; // Unlock full vertical rotation in extract mode
+    isSelectionDrawing = false;
+    setExtractActiveButton('orbit');
+    setExtractStatus('ORBIT MODE — WASD + MOUSE');
+
+    // Disable the old 3D raycaster selection mode
+    isSelectModeActive = false;
+
+    // Fade out main UI
+    fadeOutMainUI();
+
+    // Slide toolbar in
+    showExtractToolbar();
+
+    // Show the Extract HUD
+    if (extractHud) extractHud.classList.remove('hidden');
+
+    console.log(
+        '%c [SYSTEM] Extract Mode Activated — DBSE Engine Online | WASD to fly ',
+        'color: #39ff14; font-weight: bold; background: #050f08; padding: 6px 12px; border: 1px solid #39ff14; border-radius: 4px;'
+    );
+}
+
+// ── Deactivate Extract Mode ─────────────────────────────────────────────────
+function deactivateExtractMode() {
+    if (!isExtractModeActive) return;
+    isExtractModeActive = false;
+    isSelectionDrawing = false;
+    isMouseDown = false;
+
+    // Restore scene visuals
+    if (extractSceneOriginalBg) {
+        scene.background = extractSceneOriginalBg;
+    } else {
+        scene.background = new THREE.Color(0x020204);
+    }
+    if (extractSceneOriginalFog) {
+        scene.fog = new THREE.FogExp2(extractSceneOriginalFog.color.getHex(), extractSceneOriginalFog.density);
+    } else {
+        scene.fog = new THREE.FogExp2(0x020204, 0.025);
+    }
+
+    // Remove extract green light
+    if (extractGreenLight) {
+        scene.remove(extractGreenLight);
+        extractGreenLight.dispose();
+        extractGreenLight = null;
+    }
+
+    // Restore grid color
+    gridHelper.material = new THREE.LineBasicMaterial({ vertexColors: false });
+    gridHelper.geometry.dispose();
+    // Rebuild grid with original colors
+    const newGrid = new THREE.GridHelper(120, 60, 0xff00ff, 0x00f3ff);
+    newGrid.position.y = -1.5;
+    scene.remove(gridHelper);
+    scene.add(newGrid);
+
+    // Restore orbit controls
+    controls.enabled = true;
+    controls.maxPolarAngle = Math.PI / 2 - 0.05;
+
+    // Clear and disable the selection canvas overlay
+    disableSelectionCanvas();
+
+    // Hide the Extract HUD
+    if (extractHud) extractHud.classList.add('hidden');
+
+    // Slide toolbar out
+    hideExtractToolbar();
+
+    // Fade main UI back in after toolbar finishes hiding
+    setTimeout(() => {
+        fadeInMainUI();
+        logToTerminal('Extract Mode aborted. Returning to Spatial Command Core.', 'info');
+    }, 300);
+
+    // Reset camera to default overview
+    controls.target.set(0, 0.5, 0);
+    camera.position.set(0, 3, 10);
+    controls.update();
+
+    console.log(
+        '%c [SYSTEM] Extract Mode Aborted — Returning to Command Core ',
+        'color: #ff2d55; font-weight: bold; background: #0f0508; padding: 6px 12px; border: 1px solid #ff2d55; border-radius: 4px;'
+    );
+}
+
+// ── Button: [Extract Mode] in main panel ────────────────────────────────────
+if (btnExtractMode) {
+    btnExtractMode.addEventListener('click', () => {
+        activateExtractMode();
+    });
+}
+
+// ── Button: [Abort] ─────────────────────────────────────────────────────────
+if (btnExtractAbort) {
+    btnExtractAbort.addEventListener('click', () => {
+        deactivateExtractMode();
+    });
+}
+
+// ── Button: [Orbit Mode] ────────────────────────────────────────────────────
+if (btnExtractOrbit) {
+    btnExtractOrbit.addEventListener('click', () => {
+        if (!isExtractModeActive) return;
+        isSelectionDrawing = false;
+
+        // Re-enable Three.js orbit controls
+        controls.enabled = true;
+
+        // Deactivate 2D selection canvas
+        disableSelectionCanvas();
+
+        setExtractActiveButton('orbit');
+        setExtractStatus('ORBIT MODE ACTIVE');
+
+        console.log(
+            '%c [SYSTEM] Orbit Mode Engaged — Camera Navigation Unlocked ',
+            'color: #39ff14; font-weight: bold; background: #050f08; padding: 4px 10px; border-left: 3px solid #39ff14;'
+        );
+    });
+}
+
+// ── Button: [Select / Extract] ───────────────────────────────────────────────
+if (btnExtractSelect) {
+    btnExtractSelect.addEventListener('click', () => {
+        if (!isExtractModeActive) return;
+        isSelectionDrawing = true;
+
+        // Lock the camera — disable OrbitControls so mouse draws, not orbits
+        controls.enabled = false;
+
+        // Activate 2D selection canvas
+        enableSelectionCanvas();
+
+        setExtractActiveButton('select');
+        setExtractStatus('SELECT MODE — DRAW BOUNDING BOX');
+
+        console.log(
+            '%c [SYSTEM] Select/Extract Mode Engaged — Draw Bounding Box to Lock Target ',
+            'color: #39ff14; font-weight: bold; background: #050f08; padding: 4px 10px; border-left: 3px solid #39ff14;'
+        );
+    });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  2D BOUNDING-BOX CANVAS OVERLAY ENGINE
+// ══════════════════════════════════════════════════════════════════════════════
+
+let selCtx = null; // 2D context for the selection canvas
+
+// Colours used when painting the selection rectangle
+const SEL_STROKE_COLOR = 'rgba(57, 255, 20, 0.95)';
+const SEL_FILL_COLOR   = 'rgba(57, 255, 20, 0.07)';
+const SEL_CORNER_SIZE  = 6; // px — corner handle size
+
+function enableSelectionCanvas() {
+    if (!selectionCanvas) return;
+
+    // Size the canvas to exactly match the viewport
+    selectionCanvas.width  = window.innerWidth;
+    selectionCanvas.height = window.innerHeight;
+
+    selCtx = selectionCanvas.getContext('2d');
+
+    // Make it interactive (receives mouse events)
+    selectionCanvas.style.pointerEvents = 'auto';
+    selectionCanvas.classList.add('select-drawing-mode');
+}
+
+function disableSelectionCanvas() {
+    if (!selectionCanvas) return;
+
+    selectionCanvas.style.pointerEvents = 'none';
+    selectionCanvas.classList.remove('select-drawing-mode');
+
+    // Clear any drawn rectangle
+    if (selCtx) {
+        selCtx.clearRect(0, 0, selectionCanvas.width, selectionCanvas.height);
+    }
+    selCtx = null;
+    isMouseDown = false;
+}
+
+// ── Draw the neon selection rectangle ───────────────────────────────────────
+function drawSelectionRect(x, y, w, h) {
+    if (!selCtx) return;
+    selCtx.clearRect(0, 0, selectionCanvas.width, selectionCanvas.height);
+
+    // Semi-transparent fill
+    selCtx.fillStyle = SEL_FILL_COLOR;
+    selCtx.fillRect(x, y, w, h);
+
+    // Glowing neon border — draw twice for bloom effect
+    selCtx.lineWidth   = 1.5;
+    selCtx.strokeStyle = 'rgba(57, 255, 20, 0.25)';
+    selCtx.shadowColor = '#39ff14';
+    selCtx.shadowBlur  = 18;
+    selCtx.strokeRect(x, y, w, h);
+
+    selCtx.lineWidth   = 1;
+    selCtx.strokeStyle = SEL_STROKE_COLOR;
+    selCtx.shadowBlur  = 8;
+    selCtx.strokeRect(x, y, w, h);
+
+    // Corner handles — 4 small squares at each corner
+    selCtx.shadowBlur  = 12;
+    selCtx.fillStyle   = SEL_STROKE_COLOR;
+    const c = SEL_CORNER_SIZE;
+    const corners = [
+        [x - c / 2, y - c / 2],
+        [x + w - c / 2, y - c / 2],
+        [x - c / 2, y + h - c / 2],
+        [x + w - c / 2, y + h - c / 2],
+    ];
+    corners.forEach(([cx, cy]) => selCtx.fillRect(cx, cy, c, c));
+
+    // Dimension label (safe textContent-equivalent via canvas fillText)
+    selCtx.shadowBlur  = 6;
+    selCtx.fillStyle   = 'rgba(57, 255, 20, 0.85)';
+    selCtx.font        = '10px "Share Tech Mono", monospace';
+    const label = `${Math.abs(Math.round(w))} × ${Math.abs(Math.round(h))} px`;
+    selCtx.fillText(label, x + 4, y > 16 ? y - 4 : y + Math.abs(h) + 12);
+
+    // Reset shadow so it doesn't bleed into other draws
+    selCtx.shadowBlur  = 0;
+}
+
+// ── Mouse events on the selection canvas ────────────────────────────────────
+if (selectionCanvas) {
+    selectionCanvas.addEventListener('mousedown', (e) => {
+        if (!isSelectionDrawing || !isExtractModeActive) return;
+        e.preventDefault();
+        isMouseDown      = true;
+        selBoxStart      = { x: e.clientX, y: e.clientY };
+        selBoxCurrent    = { x: e.clientX, y: e.clientY };
+    });
+
+    selectionCanvas.addEventListener('mousemove', (e) => {
+        if (!isMouseDown || !isSelectionDrawing) return;
+        selBoxCurrent = { x: e.clientX, y: e.clientY };
+
+        const x = Math.min(selBoxStart.x, selBoxCurrent.x);
+        const y = Math.min(selBoxStart.y, selBoxCurrent.y);
+        const w = Math.abs(selBoxCurrent.x - selBoxStart.x);
+        const h = Math.abs(selBoxCurrent.y - selBoxStart.y);
+
+        drawSelectionRect(x, y, w, h);
+    });
+
+    selectionCanvas.addEventListener('mouseup', (e) => {
+        if (!isMouseDown || !isSelectionDrawing) return;
+        e.preventDefault();
+        isMouseDown = false;
+
+        const x = Math.min(selBoxStart.x, e.clientX);
+        const y = Math.min(selBoxStart.y, e.clientY);
+        const w = Math.abs(e.clientX - selBoxStart.x);
+        const h = Math.abs(e.clientY - selBoxStart.y);
+
+        // Ignore trivially small (accidental click) boxes
+        if (w < 8 || h < 8) {
+            if (selCtx) selCtx.clearRect(0, 0, selectionCanvas.width, selectionCanvas.height);
+            return;
+        }
+
+        const boundingBox = { x, y, w, h };
+
+        // ── [SYSTEM] Target Area Locked: log bounding box ──────────────────
+        console.log(
+            `%c [SYSTEM] Target Area Locked: { x: ${Math.round(x)}, y: ${Math.round(y)}, w: ${Math.round(w)}, h: ${Math.round(h)} } `,
+            'color: #39ff14; font-weight: bold; background: #050f08; padding: 6px 14px; border: 1px solid #39ff14; border-radius: 4px; box-shadow: 0 0 10px rgba(57,255,20,0.3);'
+        );
+
+        setExtractStatus(`TARGET LOCKED [ ${Math.round(w)}×${Math.round(h)} ]`);
+
+        // ── Screenshot: capture the 3D canvas within selection bounds ──────
+        captureSelectionSnapshot(boundingBox);
+
+        // ── DBSE Hook: placeholder for Gaussian splat filtering ────────────
+        hideSplatsInSelection(boundingBox);
+    });
+
+    // Cancel draw if mouse leaves the overlay area entirely
+    selectionCanvas.addEventListener('mouseleave', () => {
+        if (isMouseDown && isSelectionDrawing) {
+            isMouseDown = false;
+            if (selCtx) selCtx.clearRect(0, 0, selectionCanvas.width, selectionCanvas.height);
+        }
+    });
+}
+
+// Also resize the selection canvas when the window resizes
+window.addEventListener('resize', () => {
+    if (selectionCanvas && selCtx) {
+        selectionCanvas.width  = window.innerWidth;
+        selectionCanvas.height = window.innerHeight;
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  SNAPSHOT — Capture selected region from the Three.js canvas
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * captureSelectionSnapshot
+ *
+ * Reads the current Three.js WebGL canvas pixels within the supplied
+ * 2D bounding box, draws them onto a temporary off-screen canvas, and
+ * returns a PNG data-URL.  Also triggers a browser download of the crop.
+ *
+ * Security note: all data stays in memory / the user's own browser — no
+ * external origin involved, no user-controlled strings are used in any
+ * path or innerHTML context.
+ *
+ * @param {{ x: number, y: number, w: number, h: number }} bb
+ * @returns {string|null} PNG data-URL of the captured region, or null on error
+ */
+function captureSelectionSnapshot(bb) {
+    try {
+        // Three.js preserveDrawingBuffer is not set, so we must render a fresh
+        // frame immediately before reading pixels.
+        renderer.render(scene, camera);
+
+        // Clamp crop to canvas bounds (prevent out-of-bounds reads)
+        const srcCanvas = renderer.domElement;
+        const dpr       = window.devicePixelRatio || 1;
+
+        // Convert CSS pixels → physical canvas pixels
+        const px = Math.round(bb.x * dpr);
+        const py = Math.round(bb.y * dpr);
+        const pw = Math.round(bb.w * dpr);
+        const ph = Math.round(bb.h * dpr);
+
+        const clampedX = Math.max(0, Math.min(px, srcCanvas.width  - 1));
+        const clampedY = Math.max(0, Math.min(py, srcCanvas.height - 1));
+        const clampedW = Math.min(pw, srcCanvas.width  - clampedX);
+        const clampedH = Math.min(ph, srcCanvas.height - clampedY);
+
+        if (clampedW <= 0 || clampedH <= 0) {
+            console.warn('[SYSTEM] Snapshot: selection is outside the canvas bounds.');
+            return null;
+        }
+
+        // Off-screen canvas to receive the cropped pixels
+        const offCanvas = document.createElement('canvas');
+        offCanvas.width  = clampedW;
+        offCanvas.height = clampedH;
+        const offCtx = offCanvas.getContext('2d');
+
+        // Draw the portion of the 3D canvas we selected
+        offCtx.drawImage(srcCanvas, clampedX, clampedY, clampedW, clampedH, 0, 0, clampedW, clampedH);
+
+        const dataURL = offCanvas.toDataURL('image/png');
+
+        // Trigger a browser download of the snapshot
+        const link = document.createElement('a');
+        link.download = `vectra_extract_${Date.now()}.png`;
+        link.href = dataURL;
+        link.click();
+
+        console.log(
+            '%c [SYSTEM] Snapshot captured and downloaded. ',
+            'color: #39ff14; font-weight: bold; background: #050f08; padding: 4px 10px; border-left: 3px solid #39ff14;'
+        );
+        logToTerminal(`Snapshot captured: ${Math.round(bb.w)}×${Math.round(bb.h)}px region exported.`, 'success');
+
+        return dataURL;
+
+    } catch (err) {
+        // Surface a generic message; detailed error only in dev console
+        console.error('[SYSTEM_ERR] Snapshot failed:', err.message);
+        logToTerminal('SYS_ERR: Snapshot capture failed. Check console.', 'error');
+        return null;
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  DBSE — Deep Splat Excavation (Screen-Space Projection Engine)
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * hideSplatsInSelection  — DBSE Protocol
+ *
+ * Projects every 3D point in the loaded geometry through the camera's
+ * projection matrix to find which points fall inside the drawn 2D bounding box.
+ * Matching points have their colour set to fully transparent green (excavated).
+ * A final statistics readout is logged to the terminal.
+ *
+ * @param {{ x: number, y: number, w: number, h: number }} boundingBox
+ */
+function hideSplatsInSelection(boundingBox) {
+    const { x: bx, y: by, w: bw, h: bh } = boundingBox;
+
+    console.log(
+        `%c [DBSE] Excavation initiated → screen-box { x:${Math.round(bx)}, y:${Math.round(by)}, w:${Math.round(bw)}, h:${Math.round(bh)} } `,
+        'color: #ff00ff; font-weight: bold; background: #0a050a; padding: 4px 10px; border-left: 3px solid #ff00ff;'
+    );
+
+    if (!loadedModel) {
+        logToTerminal('DBSE: No spatial model loaded. Drop a .ply file first.', 'error');
+        return;
+    }
+
+    if (!loadedModel.isPoints) {
+        // For mesh geometry, use a different approach
+        logToTerminal('DBSE: Mesh geometry detected. Point-cloud mode required for excavation.', 'error');
+        return;
+    }
+
+    const geometry  = loadedModel.geometry;
+    const positions = geometry.attributes.position;
+    const colors    = geometry.attributes.color;
+
+    if (!positions) {
+        logToTerminal('DBSE: No position buffer found in geometry.', 'error');
+        return;
+    }
+
+    // Ensure we have a colour attribute to manipulate (create one if needed)
+    let colorAttr = colors;
+    if (!colorAttr) {
+        const colData = new Float32Array(positions.count * 3).fill(1.0);
+        colorAttr = new THREE.BufferAttribute(colData, 3);
+        geometry.setAttribute('color', colorAttr);
+        loadedModel.material.vertexColors = true;
+        loadedModel.material.needsUpdate = true;
+    }
+
+    // ── Screen-space projection matrix ────────────────────────────────────
+    const projMatrix = new THREE.Matrix4().multiplyMatrices(
+        camera.projectionMatrix,
+        camera.matrixWorldInverse
+    );
+    const ndcToScreen_w = window.innerWidth  / 2;
+    const ndcToScreen_h = window.innerHeight / 2;
+
+    const tmpVec = new THREE.Vector3();
+    const modelMatrix = loadedModel.matrixWorld;
+
+    let hiddenCount = 0;
+    const total = positions.count;
+
+    // ── Iterate all points and project to screen ───────────────────────────
+    for (let i = 0; i < total; i++) {
+        tmpVec.fromBufferAttribute(positions, i);
+
+        // World space
+        tmpVec.applyMatrix4(modelMatrix);
+
+        // Clip space (NDC)
+        tmpVec.applyMatrix4(projMatrix);
+
+        // Behind camera — skip
+        if (tmpVec.z > 1.0 || tmpVec.z < -1.0) continue;
+
+        // Convert NDC [-1,1] to screen pixels
+        const sx = ( tmpVec.x + 1) * ndcToScreen_w;
+        const sy = (-tmpVec.y + 1) * ndcToScreen_h;
+
+        // Test if inside bounding box
+        if (sx >= bx && sx <= bx + bw && sy >= by && sy <= by + bh) {
+            // Mark this point: set colour to dim green then hide via opacity
+            colorAttr.setXYZ(i, 0.0, 1.0, 0.08); // Briefly flash green
+            hiddenCount++;
+        }
+    }
+
+    // Commit colour changes to GPU
+    colorAttr.needsUpdate = true;
+
+    // After a brief green flash, set excavated points to black (hidden)
+    setTimeout(() => {
+        for (let i = 0; i < total; i++) {
+            tmpVec.fromBufferAttribute(positions, i);
+            tmpVec.applyMatrix4(modelMatrix);
+            tmpVec.applyMatrix4(projMatrix);
+            if (tmpVec.z > 1.0 || tmpVec.z < -1.0) continue;
+            const sx = ( tmpVec.x + 1) * ndcToScreen_w;
+            const sy = (-tmpVec.y + 1) * ndcToScreen_h;
+            if (sx >= bx && sx <= bx + bw && sy >= by && sy <= by + bh) {
+                colorAttr.setXYZ(i, 0.0, 0.0, 0.0);
+            }
+        }
+        colorAttr.needsUpdate = true;
+    }, 350);
+
+    const pct = total > 0 ? ((hiddenCount / total) * 100).toFixed(1) : '0.0';
+
+    logToTerminal(`DBSE: Excavation complete — ${hiddenCount.toLocaleString()} / ${total.toLocaleString()} nodes (${pct}%) extracted.`, 'success');
+    setExtractStatus(`EXCAVATED ${hiddenCount.toLocaleString()} NODES (${pct}%)`);
+
+    console.log(
+        `%c [DBSE] Complete: ${hiddenCount} of ${total} points (${pct}%) within selection box. `,
+        'color: #39ff14; font-weight: bold; background: #050f08; padding: 4px 10px; border-left: 3px solid #39ff14;'
+    );
 }
