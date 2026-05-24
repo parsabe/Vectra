@@ -5,7 +5,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
 
 // --- System Telemetry DOM Elements ---
-window.VECTRA_VERSION = "1.0.7-NEURAL-CB-106";
+window.VECTRA_VERSION = "1.0.8-NEURAL-CB-107";
 const telemetryRotX = document.getElementById('telemetry-rot-x');
 const telemetryRotY = document.getElementById('telemetry-rot-y');
 const terminalOutput = document.getElementById('terminal-output');
@@ -389,7 +389,7 @@ async function loadPLYModel(url) {
     }
 }
 
-function handleLocalFile(file) {
+async function handleLocalFile(file) {
     if (!file) return;
     const name = file.name;
     const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
@@ -411,71 +411,48 @@ function handleLocalFile(file) {
 
     prepareSceneForModel();
 
-    // Use FileReader to read local file
-    const reader = new FileReader();
+    try {
+        // Read file using modern Promise-based Blob.arrayBuffer()
+        // This is extremely fast (virtually instantaneous for local files) and avoids FileReader callback issues.
+        const arrayBuffer = await file.arrayBuffer();
 
-    reader.onload = async function (e) {
-        try {
-            loadingBarFill.style.width = '50%';
-            loadingPercent.textContent = 'Processing...';
-            let arrayBuffer = e.target.result;
+        loadingBarFill.style.width = '50%';
+        loadingPercent.textContent = 'Processing...';
 
-            if (name.toLowerCase().endsWith('.gz')) {
-                loadingText.textContent = 'Decompressing local spatial matrix (GZIP)...';
-                // Decompress using native DecompressionStream API
-                const ds = new DecompressionStream('gzip');
-                const decompressedStream = new Response(arrayBuffer).body.pipeThrough(ds);
-                const decompressedResponse = new Response(decompressedStream);
-                arrayBuffer = await decompressedResponse.arrayBuffer();
-            }
-
-            loadingBarFill.style.width = '85%';
-            loadingText.textContent = 'Reconstructing 3D spatial points...';
-            
-            // Asynchronous delay to let DOM elements redraw
-            await new Promise(resolve => setTimeout(resolve, 50));
-
-            const loader = new PLYLoader();
-            const geometry = loader.parse(arrayBuffer);
-
-            displayLoadedGeometry(geometry, name);
-            isModelLoading = false;
-
-        } catch (error) {
-            isModelLoading = false;
-            console.error('[LOCAL_LOAD_ERR]', error);
-            
-            // Revert UI on error
-            loadingOverlay.classList.add('hidden');
-            bentoGrid.classList.remove('hidden');
-            
-            logToTerminal(`SYS_ERR: Failed to parse local file: ${error.message}`, 'error');
-            
-            // Restore hallway view
-            hallwayGroup.visible = true;
+        let decompressedBuffer = arrayBuffer;
+        if (name.toLowerCase().endsWith('.gz')) {
+            loadingText.textContent = 'Decompressing local spatial matrix (GZIP)...';
+            const ds = new DecompressionStream('gzip');
+            const decompressedStream = new Response(arrayBuffer).body.pipeThrough(ds);
+            const decompressedResponse = new Response(decompressedStream);
+            decompressedBuffer = await decompressedResponse.arrayBuffer();
         }
-    };
 
-    reader.onerror = function (error) {
-        isModelLoading = false;
-        console.error('[READER_ERR]', error);
+        loadingBarFill.style.width = '85%';
+        loadingText.textContent = 'Reconstructing 3D spatial points...';
         
+        // Brief timeout to let the UI update and draw the progress bar
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        const loader = new PLYLoader();
+        const geometry = loader.parse(decompressedBuffer);
+
+        displayLoadedGeometry(geometry, name);
+        isModelLoading = false;
+
+    } catch (error) {
+        isModelLoading = false;
+        console.error('[LOCAL_LOAD_ERR]', error);
+        
+        // Revert UI on error
         loadingOverlay.classList.add('hidden');
         bentoGrid.classList.remove('hidden');
         
-        logToTerminal(`SYS_ERR: Failed to read local file: ${error}`, 'error');
+        logToTerminal(`SYS_ERR: Failed to parse local file: ${error.message}`, 'error');
+        
+        // Restore hallway view
         hallwayGroup.visible = true;
-    };
-
-    reader.onprogress = function (e) {
-        if (e.lengthComputable) {
-            const percentLoaded = Math.round((e.loaded / e.total) * 40); // map to first 40% of loading bar
-            loadingBarFill.style.width = `${10 + percentLoaded}%`;
-            loadingPercent.textContent = `${Math.round((e.loaded / e.total) * 100)}% read`;
-        }
-    };
-
-    reader.readAsArrayBuffer(file);
+    }
 }
 
 // --- Drag & Drop listeners bound to window ---
