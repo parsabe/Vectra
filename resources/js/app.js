@@ -1,6 +1,7 @@
 import './bootstrap';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
 
 // --- System Telemetry DOM Elements ---
 const telemetryRotX = document.getElementById('telemetry-rot-x');
@@ -9,6 +10,18 @@ const terminalOutput = document.getElementById('terminal-output');
 const terminalInput = document.getElementById('terminal-input');
 const btnExtract = document.getElementById('btn-extract-mode');
 const btnCreator = document.getElementById('btn-creator-mode');
+
+// --- Splat Mode UI Elements ---
+const bentoGrid = document.querySelector('main');
+const splatToolbar = document.getElementById('splat-toolbar');
+const loadingOverlay = document.getElementById('loading-overlay');
+const loadingText = document.getElementById('loading-text');
+const loadingBarFill = document.getElementById('loading-bar-fill');
+const loadingPercent = document.getElementById('loading-percent');
+
+const btnBackMenu = document.getElementById('btn-back-menu');
+const btnToggleSelect = document.getElementById('btn-toggle-select');
+const btnToggleSplatting = document.getElementById('btn-toggle-splatting');
 
 // --- 3D Scene Initialization ---
 const canvas = document.getElementById('vectra-canvas');
@@ -39,7 +52,7 @@ const dirLight = new THREE.DirectionalLight(0x00f3ff, 1.8);
 dirLight.position.set(5, 12, 8);
 scene.add(dirLight);
 
-// Neon Floating lights to scan the hallway
+// Neon Floating lights to scan the scene
 const cyanPointLight = new THREE.PointLight(0x00f3ff, 4, 30);
 cyanPointLight.position.set(-3, 1, 0);
 scene.add(cyanPointLight);
@@ -102,13 +115,24 @@ for (let i = -corridorLength; i <= corridorLength; i++) {
 }
 scene.add(hallwayGroup);
 
+// --- Model State & Containers ---
+let loadedModel = null;
+let isModelLoading = false;
+let isSelectModeActive = false;
+
+const pointSizes = [0.02, 0.06, 0.12, 0.20];
+let currentSizeIndex = 1; // Default 0.06
+
+const markersGroup = new THREE.Group();
+scene.add(markersGroup);
+
 // --- Orbit Controls ---
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
 controls.maxPolarAngle = Math.PI / 2 - 0.05; // Lock camera from going below floor level
-controls.minDistance = 2;
-controls.maxDistance = 45;
+controls.minDistance = 1;
+controls.maxDistance = 50;
 controls.target.set(0, 0.5, 0);
 
 // --- Animation Loop ---
@@ -126,8 +150,25 @@ function animate() {
     magentaPointLight.position.z = -Math.sin(elapsedTime * 0.7) * 20;
     magentaPointLight.position.x = 3 + Math.cos(elapsedTime * 1.2) * 1.5;
 
-    // Slow drift of the entire hallway group to make it feel "active"
-    hallwayGroup.rotation.y = Math.sin(elapsedTime * 0.05) * 0.02;
+    // Slow rotation to make the loaded model feel active
+    if (loadedModel) {
+        loadedModel.rotation.y = elapsedTime * 0.03;
+    } else {
+        // Slow drift of the corridor if no custom model is loaded
+        hallwayGroup.rotation.y = Math.sin(elapsedTime * 0.05) * 0.02;
+    }
+
+    // Animate selection markers (pulsing scale and rotation)
+    markersGroup.children.forEach(marker => {
+        const pulse = 1 + Math.sin(elapsedTime * 8) * 0.08;
+        marker.scale.set(pulse, pulse, pulse);
+        
+        const outerWire = marker.children[0];
+        if (outerWire) {
+            outerWire.rotation.x += 0.01;
+            outerWire.rotation.y += 0.02;
+        }
+    });
 
     // Update controls
     controls.update();
@@ -135,8 +176,8 @@ function animate() {
     // Render Scene
     renderer.render(scene, camera);
 
-    // Update telemetry in UI
-    if (telemetryRotX && telemetryRotY) {
+    // Update telemetry in UI (only when main menu bento grid is visible)
+    if (telemetryRotX && telemetryRotY && !bentoGrid.classList.contains('hidden')) {
         telemetryRotX.textContent = controls.object.rotation.x.toFixed(2);
         telemetryRotY.textContent = controls.object.rotation.y.toFixed(2);
     }
@@ -175,29 +216,299 @@ function logConsoleSystem(protocolIndex, protocolName) {
     const timestamp = new Date().toISOString().slice(11, 19);
     const consoleMsg = `[SYSTEM] Protocol ${protocolIndex} Initiated: ${protocolName} at ${timestamp}`;
     
-    // Style console logs to look high-tech in Developer Tools
     console.log(
         `%c ${consoleMsg} `,
         'color: #00f3ff; font-weight: bold; background: #05080f; padding: 6px 12px; border: 1px solid #00f3ff; border-radius: 4px; box-shadow: 0 0 10px rgba(0, 243, 255, 0.3);'
     );
 }
 
-// --- Protocol Scenarios Placeholders ---
-function initiateExtractMode() {
-    console.log('%c[PROTOCOL-1] Waiting for user click coordinates on holographic map...', 'color: #39ff14');
+// --- PLY Loader Implementation ---
+function loadPLYModel(url) {
+    if (isModelLoading) {
+        logToTerminal('SYS_ALERT: Extraction process already in progress.', 'error');
+        return;
+    }
+
+    isModelLoading = true;
+
+    // Transition UI to Splat loading state (everything disappears)
+    bentoGrid.classList.add('hidden');
+    loadingOverlay.classList.remove('hidden');
+    loadingBarFill.style.width = '0%';
+    loadingPercent.textContent = '0% Loaded';
+    loadingText.textContent = 'Allocating Splat memory buffers...';
+
+    // Clear previous model if exists
+    if (loadedModel) {
+        scene.remove(loadedModel);
+        loadedModel.geometry.dispose();
+        if (Array.isArray(loadedModel.material)) {
+            loadedModel.material.forEach(m => m.dispose());
+        } else {
+            loadedModel.material.dispose();
+        }
+        loadedModel = null;
+    }
+    
+    // Clear previous selection markers
+    markersGroup.replaceChildren();
+
+    // Make the corridor invisible so only the splat model shows up
+    hallwayGroup.visible = false;
+
+    const loader = new PLYLoader();
+
+    loader.load(
+        url,
+        (geometry) => {
+            isModelLoading = false;
+            
+            // Hide loading overlay, show floating splat toolbar
+            loadingOverlay.classList.add('hidden');
+            splatToolbar.classList.remove('hidden');
+
+            // Reset toolbar buttons state
+            isSelectModeActive = false;
+            if (btnToggleSelect) {
+                btnToggleSelect.textContent = '[Select Objects: OFF]';
+                btnToggleSelect.classList.remove('btn-cyber-magenta');
+                btnToggleSelect.classList.add('btn-cyber-cyan');
+            }
+            if (btnToggleSplatting) {
+                btnToggleSplatting.textContent = '[3D Splatting: Point Size 0.06]';
+            }
+
+            // Set up Material. Supporting both mesh geometries and raw point clouds
+            let material;
+            const isMesh = geometry.index !== null || (geometry.attributes.normal !== undefined);
+
+            if (isMesh) {
+                geometry.computeVertexNormals();
+                material = new THREE.MeshStandardMaterial({
+                    vertexColors: geometry.attributes.color !== undefined,
+                    roughness: 0.4,
+                    metalness: 0.2,
+                    flatShading: true
+                });
+
+                if (geometry.attributes.color === undefined) {
+                    material.color.setHex(0x00f3ff);
+                    material.emissive.setHex(0x001a33);
+                }
+
+                loadedModel = new THREE.Mesh(geometry, material);
+            } else {
+                // Point cloud scan styling
+                material = new THREE.PointsMaterial({
+                    size: 0.06,
+                    vertexColors: geometry.attributes.color !== undefined,
+                    transparent: true,
+                    opacity: 0.85
+                });
+
+                if (geometry.attributes.color === undefined) {
+                    material.color.setHex(0x00f3ff);
+                }
+
+                loadedModel = new THREE.Points(geometry, material);
+            }
+
+            // Center and scale the geometry
+            geometry.computeBoundingBox();
+            geometry.center();
+
+            const size = new THREE.Vector3();
+            geometry.boundingBox.getSize(size);
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const targetScale = 9.0 / maxDim; // Fit within 9 units box
+            loadedModel.scale.set(targetScale, targetScale, targetScale);
+
+            // Position at grid center
+            loadedModel.position.set(0, 1.0, 0);
+            scene.add(loadedModel);
+
+            // Retarget controls camera view to the center
+            controls.target.set(0, 1.0, 0);
+            camera.position.set(0, 3, 10);
+            controls.update();
+
+            const nodesCount = geometry.attributes.position.count;
+            console.log(`%c[VECTRA] Map complete: ${nodesCount.toLocaleString()} spatial nodes loaded.`, 'color: #39ff14');
+        },
+        (xhr) => {
+            if (xhr.lengthComputable) {
+                const percent = Math.round((xhr.loaded / xhr.total) * 100);
+                loadingBarFill.style.width = `${percent}%`;
+                loadingPercent.textContent = `${percent}% Loaded`;
+                loadingText.textContent = `Streaming point cloud scan data... (${(xhr.loaded / 1024 / 1024).toFixed(1)} MB)`;
+            }
+        },
+        (error) => {
+            isModelLoading = false;
+            console.error('[LOAD_ERR]', error);
+            
+            // Revert UI on error
+            loadingOverlay.classList.add('hidden');
+            bentoGrid.classList.remove('hidden');
+            
+            logToTerminal(`SYS_ERR: Failed to load spatial data matrix.`, 'error');
+            
+            // Restore hallway view
+            hallwayGroup.visible = true;
+        }
+    );
 }
 
-function initiateCreatorMode() {
-    console.log('%c[PROTOCOL-2] Initializing GAN/NeRF text-to-spatial projection...', 'color: #ff00ff');
+// --- Raycaster & Point/Object Selection ---
+const raycaster = new THREE.Raycaster();
+raycaster.params.Points.threshold = 0.2; // Expand selection threshold for thin point clouds
+const mouse = new THREE.Vector2();
+
+canvas.addEventListener('click', (event) => {
+    // Raycast only if splat mode is active, model is loaded, and Select mode is toggled ON
+    if (!loadedModel || isModelLoading || !isSelectModeActive) return;
+    if (event.target !== canvas) return;
+
+    // Calculate normalized device coordinates
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObject(loadedModel, true);
+
+    if (intersects.length > 0) {
+        const hit = intersects[0];
+        const point = hit.point;
+
+        // Visual indicator creation at clicked intersection
+        const markerGeom = new THREE.SphereGeometry(0.12, 16, 16);
+        const markerMat = new THREE.MeshBasicMaterial({
+            color: 0xff00ff,
+            transparent: true,
+            opacity: 0.9,
+            depthTest: true
+        });
+        const marker = new THREE.Mesh(markerGeom, markerMat);
+        marker.position.copy(point);
+
+        // Tech accent ring
+        const outerRingGeom = new THREE.SphereGeometry(0.24, 8, 8);
+        const outerEdges = new THREE.EdgesGeometry(outerRingGeom);
+        const outerMat = new THREE.LineBasicMaterial({
+            color: 0x00f3ff,
+            transparent: true,
+            opacity: 0.7
+        });
+        const outerWire = new THREE.LineSegments(outerEdges, outerMat);
+        marker.add(outerWire);
+
+        markersGroup.add(marker);
+
+        // Max 10 coordinate logs stored concurrently in scene (FIFO)
+        if (markersGroup.children.length > 10) {
+            markersGroup.remove(markersGroup.children[0]);
+        }
+
+        console.log(
+            `%c [VECTRA COORDINATE LOCK] X: ${point.x.toFixed(4)} | Y: ${point.y.toFixed(4)} | Z: ${point.z.toFixed(4)} `,
+            'color: #ff00ff; font-weight: bold; background: #05080f; padding: 4px; border-left: 3px solid #ff00ff;'
+        );
+    }
+});
+
+// --- Splat Toolbar Interactive Functions ---
+
+// 1. Back to Menu
+if (btnBackMenu) {
+    btnBackMenu.addEventListener('click', () => {
+        // Remove loaded model
+        if (loadedModel) {
+            scene.remove(loadedModel);
+            loadedModel.geometry.dispose();
+            if (Array.isArray(loadedModel.material)) {
+                loadedModel.material.forEach(m => m.dispose());
+            } else {
+                loadedModel.material.dispose();
+            }
+            loadedModel = null;
+        }
+        
+        // Clear selection markers
+        markersGroup.replaceChildren();
+
+        // Transition UI (reveal bento grid, hide toolbar)
+        splatToolbar.classList.add('hidden');
+        bentoGrid.classList.remove('hidden');
+
+        // Restore scanned hallway background
+        hallwayGroup.visible = true;
+
+        // Reset controls targets
+        controls.target.set(0, 0.5, 0);
+        camera.position.set(0, 3, 10);
+        controls.update();
+
+        // Reset state values
+        isSelectModeActive = false;
+        if (btnToggleSelect) {
+            btnToggleSelect.textContent = '[Select Objects: OFF]';
+            btnToggleSelect.classList.remove('btn-cyber-magenta');
+            btnToggleSelect.classList.add('btn-cyber-cyan');
+        }
+
+        logToTerminal('Returned to Spatial Command Core. Telemetry link restored.', 'info');
+    });
 }
 
-// --- Event Listeners binding ---
+// 2. Select Objects mode toggle
+if (btnToggleSelect) {
+    btnToggleSelect.addEventListener('click', () => {
+        isSelectModeActive = !isSelectModeActive;
+
+        if (isSelectModeActive) {
+            btnToggleSelect.textContent = '[Select Objects: ON]';
+            btnToggleSelect.classList.remove('btn-cyber-cyan');
+            btnToggleSelect.classList.add('btn-cyber-magenta');
+            console.log('%c[VECTRA] Selection Mode Active. Click points on model to select.', 'color: #ff00ff');
+        } else {
+            btnToggleSelect.textContent = '[Select Objects: OFF]';
+            btnToggleSelect.classList.remove('btn-cyber-magenta');
+            btnToggleSelect.classList.add('btn-cyber-cyan');
+            console.log('%c[VECTRA] Selection Mode Deactivated.', 'color: #00f3ff');
+        }
+    });
+}
+
+// 3. 3D Splatting rendering adjustments
+if (btnToggleSplatting) {
+    btnToggleSplatting.addEventListener('click', () => {
+        if (!loadedModel) return;
+
+        if (loadedModel.isPoints) {
+            // Cycle Point Cloud sizes
+            currentSizeIndex = (currentSizeIndex + 1) % pointSizes.length;
+            const nextSize = pointSizes[currentSizeIndex];
+            loadedModel.material.size = nextSize;
+            loadedModel.material.needsUpdate = true;
+            btnToggleSplatting.textContent = `[3D Splatting: Point Size ${nextSize}]`;
+            console.log(`%c[VECTRA] Point cloud rendering size set to: ${nextSize}`, 'color: #00f3ff');
+        } else if (loadedModel.isMesh) {
+            // Cycle Mesh wireframe state for standard geometries
+            loadedModel.material.wireframe = !loadedModel.material.wireframe;
+            loadedModel.material.needsUpdate = true;
+            btnToggleSplatting.textContent = `[3D Splatting: Wireframe: ${loadedModel.material.wireframe ? 'ON' : 'OFF'}]`;
+            console.log(`%c[VECTRA] Mesh wireframe state set to: ${loadedModel.material.wireframe}`, 'color: #00f3ff');
+        }
+    });
+}
+
+// --- Main Menu Buttons binding ---
 if (btnExtract) {
     btnExtract.addEventListener('click', () => {
         logConsoleSystem(1, 'Extract Mode');
         logToTerminal('Protocol 1 Initiated: Extract Mode...', 'info');
-        logToTerminal('Hologram scanning matrix active.', 'success');
-        initiateExtractMode();
+        loadPLYModel('/files/point_cloud.ply');
     });
 }
 
@@ -206,7 +517,7 @@ if (btnCreator) {
         logConsoleSystem(2, 'Creator Mode');
         logToTerminal('Protocol 2 Initiated: Creator Mode...', 'info');
         logToTerminal('Text-to-3D neural network initialized.', 'success');
-        initiateCreatorMode();
+        logToTerminal('SYS_STATUS: Awaiting latent diffusion prompt input...', 'info');
     });
 }
 
@@ -218,12 +529,12 @@ if (terminalInput) {
             logToTerminal(`USER@VECTRA: ${inputVal}`, 'info');
             terminalInput.value = '';
 
-            // Generate responses
+            // Process inputs
             setTimeout(() => {
                 const query = inputVal.toLowerCase();
                 if (query === 'help') {
                     logToTerminal('Available Protocols:', 'info');
-                    logToTerminal(' - extract : Trigger Image-to-3D extraction matrix', 'info');
+                    logToTerminal(' - extract : Initialize .ply cloud data load', 'info');
                     logToTerminal(' - creator : Trigger Text-to-3D spatial diffusion', 'info');
                     logToTerminal(' - clear   : Flush neural terminal console buffer', 'info');
                 } else if (query === 'extract' || query === 'protocol 1') {

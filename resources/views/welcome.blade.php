@@ -181,6 +181,31 @@
 
     </main>
 
+    <!-- Splat Toolbar: Displayed in full-screen splat mode -->
+    <div id="splat-toolbar" class="fixed top-6 left-1/2 -translate-x-1/2 z-20 pointer-events-auto cyber-glass px-6 py-3 rounded-full flex gap-4 md:gap-6 items-center hidden border border-cyan-500/30">
+        <span class="text-glow-cyan font-bold tracking-widest text-[10px] md:text-xs font-mono uppercase">VECTRA // SPLAT_VIEWER</span>
+        <div class="h-4 w-px bg-cyan-900/60"></div>
+        <button id="btn-back-menu" class="btn-cyber-cyan px-3 py-1.5 rounded text-[9px] md:text-[10px] uppercase font-semibold tracking-wider focus:outline-none">
+            [Back to Menu]
+        </button>
+        <button id="btn-toggle-select" class="btn-cyber-cyan px-3 py-1.5 rounded text-[9px] md:text-[10px] uppercase font-semibold tracking-wider focus:outline-none">
+            [Select Objects: OFF]
+        </button>
+        <button id="btn-toggle-splatting" class="btn-cyber-cyan px-3 py-1.5 rounded text-[9px] md:text-[10px] uppercase font-semibold tracking-wider focus:outline-none">
+            [3D Splatting: Point Size 0.06]
+        </button>
+    </div>
+
+    <!-- Loading Overlay for 3D PLY load progress -->
+    <div id="loading-overlay" class="fixed inset-0 z-30 bg-black/90 flex flex-col justify-center items-center gap-4 hidden pointer-events-auto font-mono text-xs text-cyan-400">
+        <div class="w-12 h-12 border-2 border-t-cyan-400 border-r-transparent border-b-cyan-400 border-l-transparent rounded-full animate-spin shadow-[0_0_15px_rgba(0,243,255,0.3)]"></div>
+        <div id="loading-text" class="text-glow-cyan uppercase tracking-widest mt-2 text-center px-4">Initializing Neural Extraction...</div>
+        <div class="w-64 bg-cyan-950/40 h-2 rounded-full overflow-hidden border border-cyan-700/30">
+            <div id="loading-bar-fill" class="bg-cyan-400 h-full w-[0%] transition-all duration-100 shadow-[0_0_8px_#00f3ff]"></div>
+        </div>
+        <div id="loading-percent" class="text-[10px] text-cyan-500">0% Loaded</div>
+    </div>
+
 </body>
 
 </html>
