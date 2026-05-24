@@ -56,6 +56,7 @@ async def generate_3d(req: Generate3DRequest):
     return {"model_url": f"/storage/{mock_path}", "status": "Mesh generated"}
 
 @app.post("/api/extract")
+@app.post("/extract")
 async def extract_object(req: ExtractRequest):
     """
     Spatially extract 3D mesh from bounding box image using local rembg + cloud TripoSR.
