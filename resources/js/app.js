@@ -270,20 +270,30 @@ function animate() {
         }
     });
 
-    if (viewer && viewer.initialized && viewer.splatRenderReady) {
-        // First frame that splatRenderReady becomes true — trigger UI reveal
-        if (pendingSplatDisplay) {
-            const { fileName, objectURL: blobURL } = pendingSplatDisplay;
-            pendingSplatDisplay = null;
-            displayLoadedSplatViewer(fileName);
-            // Safe to revoke blob URL now: sort worker has completed its first pass
-            if (blobURL) URL.revokeObjectURL(blobURL);
-        }
-        if (isFlightControlsActive && !isSelectModeActive && !isSelectionDrawingMode) {
-            updateFlyControls(delta);
-        }
+    if (viewer && viewer.initialized) {
+        // Always pump viewer.update() so the sort worker's runAfterNextSort callbacks
+        // can fire and set splatRenderReady = true. Gating on splatRenderReady here
+        // causes a deadlock — the flag is only set FROM WITHIN update().
         viewer.update();
-        viewer.render();
+
+        if (viewer.splatRenderReady) {
+            // First frame that splatRenderReady becomes true — trigger UI reveal
+            if (pendingSplatDisplay) {
+                const { fileName, objectURL: blobURL } = pendingSplatDisplay;
+                pendingSplatDisplay = null;
+                displayLoadedSplatViewer(fileName);
+                // Safe to revoke blob URL now: sort worker has completed its first pass
+                if (blobURL) URL.revokeObjectURL(blobURL);
+            }
+            if (isFlightControlsActive && !isSelectModeActive && !isSelectionDrawingMode) {
+                updateFlyControls(delta);
+            }
+            viewer.render();
+        } else {
+            // Still loading/sorting — keep rendering the background scene
+            controls.update();
+            renderer.render(scene, camera);
+        }
     } else {
         controls.update();
         renderer.render(scene, camera);
