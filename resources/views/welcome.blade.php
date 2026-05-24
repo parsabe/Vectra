@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VECTRA // Spatial Neural Core</title>
+    <title>VECTRA - Spatial Neural Core</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <!-- Load compiled stylesheets and JS via Vite -->
