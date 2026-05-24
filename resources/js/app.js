@@ -1,9 +1,11 @@
 import './bootstrap';
+// --- VECTRA_NEURAL_CORE_CACHE_BUSTER_V104 ---
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
 
 // --- System Telemetry DOM Elements ---
+window.VECTRA_VERSION = "1.0.5-NEURAL-CB-104";
 const telemetryRotX = document.getElementById('telemetry-rot-x');
 const telemetryRotY = document.getElementById('telemetry-rot-y');
 const terminalOutput = document.getElementById('terminal-output');
@@ -234,9 +236,9 @@ async function loadPLYModel(url) {
     // Transition UI to Splat loading state (everything disappears)
     bentoGrid.classList.add('hidden');
     loadingOverlay.classList.remove('hidden');
-    loadingBarFill.style.width = '0%';
-    loadingPercent.textContent = '0% Loaded';
-    loadingText.textContent = 'Connecting to neural file-stream...';
+    loadingBarFill.style.width = '20%';
+    loadingPercent.textContent = 'Streaming...';
+    loadingText.textContent = 'Connecting to neural file-stream (6.9 MB)...';
 
     // Clear previous model if exists
     if (loadedModel) {
@@ -265,41 +267,22 @@ async function loadPLYModel(url) {
             throw new Error(`HTTP network error ${response.status}`);
         }
 
-        const contentLength = +response.headers.get('Content-Length');
-        const reader = response.body.getReader();
-
-        let receivedBytes = 0;
-        const chunks = [];
-
-        // Loop to read incoming chunks and track progress
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            chunks.push(value);
-            receivedBytes += value.length;
-
-            if (contentLength) {
-                const percent = Math.round((receivedBytes / contentLength) * 100);
-                loadingBarFill.style.width = `${percent}%`;
-                loadingPercent.textContent = `${percent}% Loaded`;
-                loadingText.textContent = `Streaming compressed splat cloud... (${(receivedBytes / 1024 / 1024).toFixed(1)} MB / ${(contentLength / 1024 / 1024).toFixed(1)} MB)`;
-            } else {
-                loadingPercent.textContent = 'Streaming...';
-                loadingText.textContent = `Streaming compressed splat cloud... (${(receivedBytes / 1024 / 1024).toFixed(1)} MB)`;
-            }
-        }
-
-        // Hardware-accelerated browser-native Decompression
+        loadingBarFill.style.width = '60%';
         loadingText.textContent = 'Decompressing spatial matrix (GZIP)...';
-        const blob = new Blob(chunks);
+
+        // Read the response as ArrayBuffer in one go
+        const compressedBuffer = await response.arrayBuffer();
+
+        // Decompress using native DecompressionStream API
         const ds = new DecompressionStream('gzip');
-        const decompressedStream = blob.stream().pipeThrough(ds);
+        const decompressedStream = new Response(compressedBuffer).body.pipeThrough(ds);
         const decompressedResponse = new Response(decompressedStream);
         const arrayBuffer = await decompressedResponse.arrayBuffer();
 
-        // Parse geometry using PLYLoader (asynchronously to allow DOM redraw first)
+        loadingBarFill.style.width = '90%';
         loadingText.textContent = 'Reconstructing 3D spatial points...';
+        
+        // Asynchronous delay to let DOM elements redraw
         await new Promise(resolve => setTimeout(resolve, 50));
 
         const loader = new PLYLoader();
@@ -322,7 +305,7 @@ async function loadPLYModel(url) {
 
         // Set up Material. Supporting both mesh geometries and raw point clouds
         let material;
-        const isMesh = geometry.index !== null || (geometry.attributes.normal !== undefined);
+        const isMesh = geometry.index !== null;
 
         if (isMesh) {
             geometry.computeVertexNormals();
@@ -386,7 +369,7 @@ async function loadPLYModel(url) {
         loadingOverlay.classList.add('hidden');
         bentoGrid.classList.remove('hidden');
         
-        logToTerminal(`SYS_ERR: Failed to parse spatial data matrix: ${error.message}`, 'error');
+        logToTerminal(`SYS_ERR: Failed to load spatial data matrix: ${error.message}`, 'error');
         
         // Restore hallway view
         hallwayGroup.visible = true;
