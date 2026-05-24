@@ -5,7 +5,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
 
 // --- System Telemetry DOM Elements ---
-window.VECTRA_VERSION = "1.0.5-NEURAL-CB-104";
+window.VECTRA_VERSION = "1.0.6-NEURAL-CB-105";
 const telemetryRotX = document.getElementById('telemetry-rot-x');
 const telemetryRotY = document.getElementById('telemetry-rot-y');
 const terminalOutput = document.getElementById('terminal-output');
@@ -24,6 +24,11 @@ const loadingPercent = document.getElementById('loading-percent');
 const btnBackMenu = document.getElementById('btn-back-menu');
 const btnToggleSelect = document.getElementById('btn-toggle-select');
 const btnToggleSplatting = document.getElementById('btn-toggle-splatting');
+
+// --- Drag & Drop / Local Upload UI Elements ---
+const dropZoneOverlay = document.getElementById('drop-zone-overlay');
+const fileUploader = document.getElementById('file-uploader');
+const btnUploadFile = document.getElementById('btn-upload-file');
 
 // --- 3D Scene Initialization ---
 const canvas = document.getElementById('vectra-canvas');
@@ -225,21 +230,7 @@ function logConsoleSystem(protocolIndex, protocolName) {
 }
 
 // --- PLY Loader with Native GZIP Streaming Decompression ---
-async function loadPLYModel(url) {
-    if (isModelLoading) {
-        logToTerminal('SYS_ALERT: Extraction process already in progress.', 'error');
-        return;
-    }
-
-    isModelLoading = true;
-
-    // Transition UI to Splat loading state (everything disappears)
-    bentoGrid.classList.add('hidden');
-    loadingOverlay.classList.remove('hidden');
-    loadingBarFill.style.width = '20%';
-    loadingPercent.textContent = 'Streaming...';
-    loadingText.textContent = 'Connecting to neural file-stream (6.9 MB)...';
-
+function prepareSceneForModel() {
     // Clear previous model if exists
     if (loadedModel) {
         scene.remove(loadedModel);
@@ -257,6 +248,99 @@ async function loadPLYModel(url) {
 
     // Make the corridor invisible so only the splat model shows up
     hallwayGroup.visible = false;
+}
+
+function displayLoadedGeometry(geometry, fileName) {
+    // Hide loading overlay, show floating splat toolbar
+    loadingOverlay.classList.add('hidden');
+    splatToolbar.classList.remove('hidden');
+
+    // Reset toolbar buttons state
+    isSelectModeActive = false;
+    if (btnToggleSelect) {
+        btnToggleSelect.textContent = '[Select Objects: OFF]';
+        btnToggleSelect.classList.remove('btn-cyber-magenta');
+        btnToggleSelect.classList.add('btn-cyber-cyan');
+    }
+    if (btnToggleSplatting) {
+        btnToggleSplatting.textContent = '[3D Splatting: Point Size 0.06]';
+    }
+
+    // Set up Material. Supporting both mesh geometries and raw point clouds
+    let material;
+    const isMesh = geometry.index !== null;
+
+    if (isMesh) {
+        geometry.computeVertexNormals();
+        material = new THREE.MeshStandardMaterial({
+            vertexColors: geometry.attributes.color !== undefined,
+            roughness: 0.4,
+            metalness: 0.2,
+            flatShading: true
+        });
+
+        if (geometry.attributes.color === undefined) {
+            material.color.setHex(0x00f3ff);
+            material.emissive.setHex(0x001a33);
+        }
+
+        loadedModel = new THREE.Mesh(geometry, material);
+    } else {
+        // Point cloud scan styling
+        material = new THREE.PointsMaterial({
+            size: 0.06,
+            vertexColors: geometry.attributes.color !== undefined,
+            transparent: true,
+            opacity: 0.85
+        });
+
+        if (geometry.attributes.color === undefined) {
+            material.color.setHex(0x00f3ff);
+        }
+
+        loadedModel = new THREE.Points(geometry, material);
+    }
+
+    // Center and scale the geometry
+    geometry.computeBoundingBox();
+    geometry.center();
+
+    const size = new THREE.Vector3();
+    geometry.boundingBox.getSize(size);
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const targetScale = 9.0 / maxDim; // Fit within 9 units box
+    loadedModel.scale.set(targetScale, targetScale, targetScale);
+
+    // Position at grid center
+    loadedModel.position.set(0, 1.0, 0);
+    scene.add(loadedModel);
+
+    // Retarget controls camera view to the center
+    controls.target.set(0, 1.0, 0);
+    camera.position.set(0, 3, 10);
+    controls.update();
+
+    const nodesCount = geometry.attributes.position.count;
+    console.log(`%c[VECTRA] Map complete: ${nodesCount.toLocaleString()} spatial nodes loaded from ${fileName}.`, 'color: #39ff14');
+    logToTerminal(`Neural stream mapped: ${nodesCount.toLocaleString()} nodes parsed successfully.`, 'success');
+}
+
+async function loadPLYModel(url) {
+    if (isModelLoading) {
+        logToTerminal('SYS_ALERT: Extraction process already in progress.', 'error');
+        return;
+    }
+
+    isModelLoading = true;
+
+    // Transition UI to Splat loading state (everything disappears)
+    bentoGrid.classList.add('hidden');
+    loadingOverlay.classList.remove('hidden');
+    loadingBarFill.style.width = '20%';
+    loadingPercent.textContent = 'Streaming...';
+    loadingText.textContent = 'Connecting to neural file-stream (6.9 MB)...';
+
+    prepareSceneForModel();
 
     try {
         logToTerminal('Opening compressed stream: /files/point_cloud_optimized.ply.gz...');
@@ -288,77 +372,7 @@ async function loadPLYModel(url) {
         const loader = new PLYLoader();
         const geometry = loader.parse(arrayBuffer);
 
-        // Hide loading overlay, show floating splat toolbar
-        loadingOverlay.classList.add('hidden');
-        splatToolbar.classList.remove('hidden');
-
-        // Reset toolbar buttons state
-        isSelectModeActive = false;
-        if (btnToggleSelect) {
-            btnToggleSelect.textContent = '[Select Objects: OFF]';
-            btnToggleSelect.classList.remove('btn-cyber-magenta');
-            btnToggleSelect.classList.add('btn-cyber-cyan');
-        }
-        if (btnToggleSplatting) {
-            btnToggleSplatting.textContent = '[3D Splatting: Point Size 0.06]';
-        }
-
-        // Set up Material. Supporting both mesh geometries and raw point clouds
-        let material;
-        const isMesh = geometry.index !== null;
-
-        if (isMesh) {
-            geometry.computeVertexNormals();
-            material = new THREE.MeshStandardMaterial({
-                vertexColors: geometry.attributes.color !== undefined,
-                roughness: 0.4,
-                metalness: 0.2,
-                flatShading: true
-            });
-
-            if (geometry.attributes.color === undefined) {
-                material.color.setHex(0x00f3ff);
-                material.emissive.setHex(0x001a33);
-            }
-
-            loadedModel = new THREE.Mesh(geometry, material);
-        } else {
-            // Point cloud scan styling
-            material = new THREE.PointsMaterial({
-                size: 0.06,
-                vertexColors: geometry.attributes.color !== undefined,
-                transparent: true,
-                opacity: 0.85
-            });
-
-            if (geometry.attributes.color === undefined) {
-                material.color.setHex(0x00f3ff);
-            }
-
-            loadedModel = new THREE.Points(geometry, material);
-        }
-
-        // Center and scale the geometry
-        geometry.computeBoundingBox();
-        geometry.center();
-
-        const size = new THREE.Vector3();
-        geometry.boundingBox.getSize(size);
-        const maxDim = Math.max(size.x, size.y, size.z);
-        const targetScale = 9.0 / maxDim; // Fit within 9 units box
-        loadedModel.scale.set(targetScale, targetScale, targetScale);
-
-        // Position at grid center
-        loadedModel.position.set(0, 1.0, 0);
-        scene.add(loadedModel);
-
-        // Retarget controls camera view to the center
-        controls.target.set(0, 1.0, 0);
-        camera.position.set(0, 3, 10);
-        controls.update();
-
-        const nodesCount = geometry.attributes.position.count;
-        console.log(`%c[VECTRA] Map complete: ${nodesCount.toLocaleString()} spatial nodes loaded.`, 'color: #39ff14');
+        displayLoadedGeometry(geometry, 'point_cloud_optimized.ply.gz');
         isModelLoading = false;
 
     } catch (error) {
@@ -374,6 +388,147 @@ async function loadPLYModel(url) {
         // Restore hallway view
         hallwayGroup.visible = true;
     }
+}
+
+function handleLocalFile(file) {
+    if (!file) return;
+    const name = file.name;
+    const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+    logToTerminal(`Loading local file: ${name} (${sizeMB} MB)...`);
+
+    if (isModelLoading) {
+        logToTerminal('SYS_ALERT: Extraction process already in progress.', 'error');
+        return;
+    }
+
+    isModelLoading = true;
+
+    // Transition UI to Splat loading state (everything disappears)
+    bentoGrid.classList.add('hidden');
+    loadingOverlay.classList.remove('hidden');
+    loadingBarFill.style.width = '10%';
+    loadingPercent.textContent = 'Reading...';
+    loadingText.textContent = `Reading local file: ${name} (${sizeMB} MB)...`;
+
+    prepareSceneForModel();
+
+    // Use FileReader to read local file
+    const reader = new FileReader();
+
+    reader.onload = async function (e) {
+        try {
+            loadingBarFill.style.width = '50%';
+            loadingPercent.textContent = 'Processing...';
+            let arrayBuffer = e.target.result;
+
+            if (name.toLowerCase().endsWith('.gz')) {
+                loadingText.textContent = 'Decompressing local spatial matrix (GZIP)...';
+                // Decompress using native DecompressionStream API
+                const ds = new DecompressionStream('gzip');
+                const decompressedStream = new Response(arrayBuffer).body.pipeThrough(ds);
+                const decompressedResponse = new Response(decompressedStream);
+                arrayBuffer = await decompressedResponse.arrayBuffer();
+            }
+
+            loadingBarFill.style.width = '85%';
+            loadingText.textContent = 'Reconstructing 3D spatial points...';
+            
+            // Asynchronous delay to let DOM elements redraw
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            const loader = new PLYLoader();
+            const geometry = loader.parse(arrayBuffer);
+
+            displayLoadedGeometry(geometry, name);
+            isModelLoading = false;
+
+        } catch (error) {
+            isModelLoading = false;
+            console.error('[LOCAL_LOAD_ERR]', error);
+            
+            // Revert UI on error
+            loadingOverlay.classList.add('hidden');
+            bentoGrid.classList.remove('hidden');
+            
+            logToTerminal(`SYS_ERR: Failed to parse local file: ${error.message}`, 'error');
+            
+            // Restore hallway view
+            hallwayGroup.visible = true;
+        }
+    };
+
+    reader.onerror = function (error) {
+        isModelLoading = false;
+        console.error('[READER_ERR]', error);
+        
+        loadingOverlay.classList.add('hidden');
+        bentoGrid.classList.remove('hidden');
+        
+        logToTerminal(`SYS_ERR: Failed to read local file: ${error}`, 'error');
+        hallwayGroup.visible = true;
+    };
+
+    reader.onprogress = function (e) {
+        if (e.lengthComputable) {
+            const percentLoaded = Math.round((e.loaded / e.total) * 40); // map to first 40% of loading bar
+            loadingBarFill.style.width = `${10 + percentLoaded}%`;
+            loadingPercent.textContent = `${Math.round((e.loaded / e.total) * 100)}% read`;
+        }
+    };
+
+    reader.readAsArrayBuffer(file);
+}
+
+// --- Drag & Drop listeners bound to window ---
+if (dropZoneOverlay) {
+    window.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        dropZoneOverlay.classList.remove('hidden');
+    });
+
+    window.addEventListener('dragenter', (e) => {
+        e.preventDefault();
+    });
+
+    window.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        // Only hide if we drag completely outside the document or window
+        if (!e.relatedTarget || e.clientY <= 0 || e.clientX <= 0 || e.clientX >= window.innerWidth || e.clientY >= window.innerHeight) {
+            dropZoneOverlay.classList.add('hidden');
+        }
+    });
+
+    window.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZoneOverlay.classList.add('hidden');
+
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            const file = e.dataTransfer.files[0];
+            const name = file.name.toLowerCase();
+            if (name.endsWith('.ply') || name.endsWith('.ply.gz') || name.endsWith('.gz')) {
+                handleLocalFile(file);
+            } else {
+                logToTerminal('SYS_ERR: Invalid file format. Only .ply and .ply.gz are supported.', 'error');
+            }
+        }
+    });
+}
+
+// --- File Input selectors triggers ---
+if (btnUploadFile && fileUploader) {
+    btnUploadFile.addEventListener('click', () => {
+        fileUploader.click();
+    });
+
+    fileUploader.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+            const file = e.target.files[0];
+            handleLocalFile(file);
+            // Reset value so same file can be selected again
+            e.target.value = '';
+        }
+    });
 }
 
 // --- Raycaster & Point/Object Selection ---

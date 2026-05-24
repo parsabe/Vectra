@@ -154,13 +154,22 @@
                     class="btn-cyber-cyan w-full py-3 rounded font-semibold text-xs uppercase tracking-widest focus:outline-none">
                     [Extract Mode]
                 </button>
-                <div class="text-[10px] font-mono text-cyan-600 text-center -mt-2.5 mb-1">Image-to-3D Protocol</div>
+                <div class="text-[10px] font-mono text-cyan-600 text-center -mt-2.5 mb-2">Image-to-3D Protocol</div>
+
+                <button id="btn-upload-file"
+                    class="btn-cyber-cyan w-full py-3 rounded font-semibold text-xs uppercase tracking-widest focus:outline-none border-dashed border-2">
+                    [Upload PLY Model]
+                </button>
+                <div class="text-[10px] font-mono text-cyan-600 text-center -mt-2.5 mb-2">Local File (drag/drop)</div>
 
                 <button id="btn-creator-mode"
                     class="btn-cyber-magenta w-full py-3 rounded font-semibold text-xs uppercase tracking-widest focus:outline-none">
                     [Creator Mode]
                 </button>
                 <div class="text-[10px] font-mono text-fuchsia-600 text-center -mt-2.5">Text-to-3D Protocol</div>
+
+                <!-- Hidden local file input -->
+                <input type="file" id="file-uploader" accept=".ply,.ply.gz,.gz" class="hidden">
             </div>
 
             <!-- Terminal Input Form -->
@@ -204,6 +213,16 @@
             <div id="loading-bar-fill" class="bg-cyan-400 h-full w-[0%] transition-all duration-100 shadow-[0_0_8px_#00f3ff]"></div>
         </div>
         <div id="loading-percent" class="text-[10px] text-cyan-500">0% Loaded</div>
+    </div>
+
+    <!-- Drag & Drop Interactive Overlay -->
+    <div id="drop-zone-overlay" class="fixed inset-0 z-40 bg-black/85 border-4 border-dashed border-cyan-400 flex flex-col justify-center items-center gap-4 hidden pointer-events-none font-mono text-cyan-400">
+        <div class="text-glow-cyan text-lg md:text-xl uppercase tracking-widest font-bold text-center px-6">
+            [DROP PLY FILE HERE TO INITIALIZE NEURAL STREAM]
+        </div>
+        <div class="text-glow-magenta text-xs md:text-sm uppercase tracking-widest text-center px-6">
+            Supports raw .ply and compressed .ply.gz spatial scans
+        </div>
     </div>
 
 </body>
