@@ -305,6 +305,22 @@
         <div id="loading-percent" class="text-[10px] text-cyan-500">0% Loaded</div>
     </div>
 
+    <!-- Loading Overlay for Extraction (Image-to-3D) -->
+    <div id="extract-loading-overlay"
+        class="fixed inset-0 z-30 bg-black/90 flex flex-col justify-center items-center gap-4 hidden pointer-events-auto font-mono text-xs text-green-400">
+        <div
+            class="w-12 h-12 border-2 border-t-green-400 border-r-transparent border-b-green-400 border-l-transparent rounded-full animate-spin shadow-[0_0_15px_rgba(57,255,20,0.3)]">
+        </div>
+        <div id="extract-loading-text" class="text-glow-green uppercase tracking-widest mt-2 text-center px-4">
+            Initializing 3D Spatial extraction...
+        </div>
+        <div class="w-64 bg-green-950/40 h-2 rounded-full overflow-hidden border border-green-700/30">
+            <div id="extract-loading-bar-fill"
+                class="bg-green-400 h-full w-[0%] transition-all duration-100 shadow-[0_0_8px_#39ff14]"></div>
+        </div>
+        <div id="extract-loading-percent" class="text-[10px] text-green-500">0% Loaded</div>
+    </div>
+
     <!-- Drag & Drop Interactive Overlay -->
     <div id="drop-zone-overlay"
         class="fixed inset-0 z-40 bg-black/85 border-4 border-dashed border-cyan-400 flex flex-col justify-center items-center gap-4 hidden pointer-events-none font-mono text-cyan-400">

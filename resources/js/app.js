@@ -3,6 +3,7 @@ import './bootstrap';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as GaussianSplats3D from '@mkkellogg/gaussian-splats-3d';
 import SortWorker from './splat-sort.worker.js?worker';
 
@@ -1179,6 +1180,10 @@ const selectionCanvas   = document.getElementById('selection-canvas');
 const extractHud        = document.getElementById('extract-hud');
 const extractHudCoords  = document.getElementById('extract-hud-coords');
 const extractHudFps     = document.getElementById('extract-hud-fps');
+const extractLoadingOverlay = document.getElementById('extract-loading-overlay');
+const extractLoadingText    = document.getElementById('extract-loading-text');
+const extractLoadingBar     = document.getElementById('extract-loading-bar-fill');
+const extractLoadingPercent = document.getElementById('extract-loading-percent');
 
 // ── Extract Mode state ──────────────────────────────────────────────────────
 let isExtractModeActive  = false;
@@ -1635,12 +1640,20 @@ window.addEventListener('resize', () => {
  * @param {{ x: number, y: number, w: number, h: number }} bb
  * @returns {string|null} PNG data-URL of the captured region, or null on error
  */
+function showExtractLoader(text, percent) {
+    if (!extractLoadingOverlay) return;
+    extractLoadingOverlay.classList.remove('hidden');
+    if (extractLoadingText) extractLoadingText.textContent = text;
+    if (extractLoadingBar) extractLoadingBar.style.width = `${percent}%`;
+    if (extractLoadingPercent) extractLoadingPercent.textContent = `${percent}% Processed`;
+}
+
+function hideExtractLoader() {
+    if (extractLoadingOverlay) extractLoadingOverlay.classList.add('hidden');
+}
+
 function captureSelectionSnapshot(bb) {
     try {
-        // Three.js preserveDrawingBuffer is not set, so we must render a fresh
-        // frame immediately before reading pixels.
-        renderer.render(scene, camera);
-
         // Clamp crop to canvas bounds (prevent out-of-bounds reads)
         const srcCanvas = renderer.domElement;
         const dpr       = window.devicePixelRatio || 1;
@@ -1672,22 +1685,89 @@ function captureSelectionSnapshot(bb) {
 
         const dataURL = offCanvas.toDataURL('image/png');
 
-        // Trigger a browser download of the snapshot
-        const link = document.createElement('a');
-        link.download = `vectra_extract_${Date.now()}.png`;
-        link.href = dataURL;
-        link.click();
-
         console.log(
-            '%c [SYSTEM] Snapshot captured and downloaded. ',
+            '%c [SYSTEM] Snapshot captured in memory. ',
             'color: #39ff14; font-weight: bold; background: #050f08; padding: 4px 10px; border-left: 3px solid #39ff14;'
         );
-        logToTerminal(`Snapshot captured: ${Math.round(bb.w)}×${Math.round(bb.h)}px region exported.`, 'success');
+        logToTerminal(`Snapshot captured: ${Math.round(bb.w)}×${Math.round(bb.h)}px region cropped.`, 'success');
+
+        // Initiate Transmission & Loading Pipeline
+        showExtractLoader("Isolating selected bounding region...", 15);
+        logToTerminal("Extract: Transmitting viewport slice to AI extraction server...");
+
+        fetch('/api-fastapi/extract', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: dataURL })
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(errData => {
+                    throw new Error(errData.detail || `Server error ${response.status}`);
+                });
+            }
+            showExtractLoader("Reconstructing 3D spatial geometry (TripoSR Space)...", 65);
+            logToTerminal("Extract: Bounding slice accepted. Generating mesh in cloud space...");
+            return response.arrayBuffer();
+        })
+        .then(arrayBuffer => {
+            showExtractLoader("Mesh generated. Compiling spatial nodes...", 90);
+            logToTerminal("Extract: Reconstructing mesh polygons...");
+
+            const loader = new GLTFLoader();
+            loader.parse(arrayBuffer, '', (gltf) => {
+                const model = gltf.scene;
+
+                // Position in front of the camera (center of camera view)
+                const forward = new THREE.Vector3();
+                camera.getWorldDirection(forward);
+                const targetPos = new THREE.Vector3().copy(camera.position).addScaledVector(forward, 5);
+                model.position.copy(targetPos);
+
+                // Center and scale the loaded mesh automatically
+                const box = new THREE.Box3().setFromObject(model);
+                const size = new THREE.Vector3();
+                box.getSize(size);
+                const maxDim = Math.max(size.x, size.y, size.z);
+                const scale = 3.5 / maxDim; // Fit inside 3.5 units
+                model.scale.set(scale, scale, scale);
+
+                // Re-center around the target position
+                const center = new THREE.Vector3();
+                box.getCenter(center);
+                model.position.x += (targetPos.x - center.x);
+                model.position.y += (targetPos.y - center.y);
+                model.position.z += (targetPos.z - center.z);
+
+                // If a model was already loaded, remove it first
+                if (loadedModel) {
+                    scene.remove(loadedModel);
+                }
+
+                // Add newly generated mesh to the scene
+                scene.add(model);
+                loadedModel = model;
+
+                // Hide loaders
+                hideExtractLoader();
+                logToTerminal("Extract: 3D model successfully injected at camera target.", "success");
+
+                // Switch back to orbit controls automatically
+                if (btnExtractOrbit) btnExtractOrbit.click();
+            }, (err) => {
+                throw new Error(`GLTF parser error: ${err.message}`);
+            });
+        })
+        .catch(err => {
+            console.error(err);
+            hideExtractLoader();
+            logToTerminal(`SYS_ERR: Spatial extraction failed: ${err.message}`, 'error');
+            if (btnExtractOrbit) btnExtractOrbit.click();
+        });
 
         return dataURL;
 
     } catch (err) {
-        // Surface a generic message; detailed error only in dev console
         console.error('[SYSTEM_ERR] Snapshot failed:', err.message);
         logToTerminal('SYS_ERR: Snapshot capture failed. Check console.', 'error');
         return null;
