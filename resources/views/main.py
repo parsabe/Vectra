@@ -16,6 +16,7 @@ import rembg
 import numpy as np
 from PIL import Image
 import tempfile
+import httpx
 from tsr.system import TSR
 from tsr.utils import remove_background, resize_foreground, to_gradio_3d_orientation
 
@@ -41,6 +42,9 @@ class Generate3DRequest(BaseModel):
 
 class ExtractRequest(BaseModel):
     image: str # base64 encoded snapshot
+
+class URLRequest(BaseModel):
+    url: str
 
 # 1. Force Background Removal onto the RTX 4060 GPU if available
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -103,6 +107,72 @@ async def extract_object(req: ExtractRequest):
         else:
             base64_data = req.image
         image_bytes = base64.b64decode(base64_data)
+
+        # Convert to PIL Image
+        image = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
+
+        # 2. Local Background Removal
+        no_bg_image = remove_background(image, rembg_session=rembg_session, force=True)
+
+        # 3. Resize foreground to standard 0.85 ratio
+        resized_image = resize_foreground(no_bg_image, 0.85)
+
+        # 4. Fill background with gray (0.5)
+        img_np = np.array(resized_image).astype(np.float32) / 255.0
+        img_np = img_np[:, :, :3] * img_np[:, :, 3:4] + (1.0 - img_np[:, :, 3:4]) * 0.5
+        final_image = Image.fromarray((img_np * 255.0).astype(np.uint8))
+
+        # 5. Forge 3D Geometry
+        print("[SYSTEM] Forging 3D Mesh locally...")
+        with torch.no_grad():
+            scene_codes = model([final_image], device=device)
+            meshes = model.extract_mesh(scene_codes, True) 
+
+        mesh = meshes[0]
+        # Rotate mesh to the correct orientation for Gradio/ThreeJS
+        mesh = to_gradio_3d_orientation(mesh)
+
+        temp_dir = tempfile.mkdtemp()
+        temp_glb_path = os.path.join(temp_dir, f"extract_{uuid.uuid4().hex}.glb")
+        mesh.export(temp_glb_path)
+        
+        if not os.path.exists(temp_glb_path):
+            raise HTTPException(status_code=500, detail="TripoSR failed to generate GLB model.")
+
+        with open(temp_glb_path, "rb") as f:
+            glb_bytes = f.read()
+
+        return Response(content=glb_bytes, media_type="model/gltf-binary")
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if temp_glb_path and os.path.exists(temp_glb_path):
+            try:
+                os.remove(temp_glb_path)
+                os.rmdir(os.path.dirname(temp_glb_path))
+            except Exception:
+                pass
+
+@app.post("/api/from-url")
+@app.post("/from-url")
+async def extract_from_url(req: URLRequest):
+    """
+    Spatially extract 3D mesh from an image URL using local rembg + local TripoSR.
+    """
+    temp_glb_path = None
+    try:
+        # Download image from URL using httpx
+        async with httpx.AsyncClient() as client:
+            try:
+                res = await client.get(req.url, timeout=30.0)
+                if res.status_code != 200:
+                    raise HTTPException(status_code=400, detail=f"Failed to fetch image from URL: status {res.status_code}")
+                image_bytes = res.content
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Error downloading image: {str(e)}")
 
         # Convert to PIL Image
         image = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
