@@ -202,6 +202,16 @@ const magentaPointLight = new THREE.PointLight(0xff00ff, 4, 30);
 magentaPointLight.position.set(3, 1, 0);
 scene.add(magentaPointLight);
 
+// Bright white lights for GLB viewport mode
+const glbAmbientLight = new THREE.AmbientLight(0xffffff, 2.5);
+glbAmbientLight.visible = false;
+scene.add(glbAmbientLight);
+
+const glbDirectionalLight = new THREE.DirectionalLight(0xffffff, 3.0);
+glbDirectionalLight.position.set(5, 10, 7);
+glbDirectionalLight.visible = false;
+scene.add(glbDirectionalLight);
+
 // --- Custom Cyberpunk Grid and Wireframe Corridor ---
 // Horizontal grid at the bottom
 const gridHelper = new THREE.GridHelper(120, 60, 0xff00ff, 0x00f3ff);
@@ -258,6 +268,8 @@ scene.add(hallwayGroup);
 
 // --- Model State & Containers ---
 let loadedModel = null;
+let loadedPointCloud = null; // Specifically for loaded .ply point clouds
+let extractedGLB = null; // Specifically for generated .glb models
 let isModelLoading = false;
 let isSelectModeActive = false;
 
@@ -407,6 +419,11 @@ function animate() {
         animateExtractScene(elapsedTime);
     }
 
+    // Update headlight position if visible
+    if (glbDirectionalLight && glbDirectionalLight.visible) {
+        glbDirectionalLight.position.copy(camera.position);
+    }
+
     // Render Scene (Viewer vs Fallback)
     if (viewer && viewer.initialized) {
         viewer.update();
@@ -515,6 +532,35 @@ async function prepareSceneForModel() {
         }
         loadedModel = null;
     }
+
+    // Clear point cloud and extracted GLB references
+    if (loadedPointCloud) {
+        scene.remove(loadedPointCloud);
+        loadedPointCloud.geometry.dispose();
+        if (Array.isArray(loadedPointCloud.material)) {
+            loadedPointCloud.material.forEach(m => m.dispose());
+        } else {
+            loadedPointCloud.material.dispose();
+        }
+        loadedPointCloud = null;
+    }
+
+    if (extractedGLB) {
+        scene.remove(extractedGLB);
+        extractedGLB.traverse(child => {
+            if (child.isMesh) {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(m => m.dispose());
+                    } else {
+                        child.material.dispose();
+                    }
+                }
+            }
+        });
+        extractedGLB = null;
+    }
     
     // Clear previous selection markers safely
     clearThreeGroup(markersGroup);
@@ -587,6 +633,7 @@ function displayLoadedGeometry(geometry, fileName) {
     // Position at grid center
     loadedModel.position.set(0, 1.0, 0);
     scene.add(loadedModel);
+    loadedPointCloud = loadedModel;
 
     // Retarget controls camera view to the center
     controls.target.set(0, 1.0, 0);
@@ -1175,6 +1222,7 @@ const extractToolbar    = document.getElementById('extract-toolbar');
 const btnExtractAbort   = document.getElementById('btn-extract-abort');
 const btnExtractOrbit   = document.getElementById('btn-extract-orbit');
 const btnExtractSelect  = document.getElementById('btn-extract-select');
+const btnExtractClear   = document.getElementById('btn-extract-clear');
 const extractModeStatus = document.getElementById('extract-mode-status');
 const selectionCanvas   = document.getElementById('selection-canvas');
 const extractHud        = document.getElementById('extract-hud');
@@ -1340,6 +1388,40 @@ function deactivateExtractMode() {
     isSelectionDrawing = false;
     isMouseDown = false;
 
+    // Remove extracted GLB if exists
+    if (extractedGLB) {
+        scene.remove(extractedGLB);
+        extractedGLB.traverse(child => {
+            if (child.isMesh) {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(m => m.dispose());
+                    } else {
+                        child.material.dispose();
+                    }
+                }
+            }
+        });
+        extractedGLB = null;
+    }
+
+    // Restore original .ply model (point cloud or splats)
+    if (loadedPointCloud) {
+        loadedPointCloud.visible = true;
+    }
+    if (viewer && viewer.splatMesh) {
+        viewer.splatMesh.visible = true;
+        viewer.forceRenderNextFrame();
+    }
+
+    // Disable GLB lights
+    glbAmbientLight.visible = false;
+    glbDirectionalLight.visible = false;
+    cyanPointLight.visible = true;
+    magentaPointLight.visible = true;
+    gridHelper.visible = true;
+
     // Restore scene visuals
     if (extractSceneOriginalBg) {
         scene.background = extractSceneOriginalBg;
@@ -1380,6 +1462,9 @@ function deactivateExtractMode() {
 
     // Slide toolbar out
     hideExtractToolbar();
+
+    // Hide clear button
+    if (btnExtractClear) btnExtractClear.classList.add('hidden');
 
     // Fade main UI back in after toolbar finishes hiding
     setTimeout(() => {
@@ -1453,6 +1538,73 @@ if (btnExtractSelect) {
             '%c [SYSTEM] Select/Extract Mode Engaged — Draw Bounding Box to Lock Target ',
             'color: #39ff14; font-weight: bold; background: #050f08; padding: 4px 10px; border-left: 3px solid #39ff14;'
         );
+    });
+}
+
+// ── Button: [Clear 3D] ──────────────────────────────────────────────────────
+if (btnExtractClear) {
+    btnExtractClear.addEventListener('click', () => {
+        // 1. Remove and dispose extracted GLB
+        if (extractedGLB) {
+            scene.remove(extractedGLB);
+            extractedGLB.traverse(child => {
+                if (child.isMesh) {
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) {
+                        if (Array.isArray(child.material)) {
+                            child.material.forEach(m => m.dispose());
+                        } else {
+                            child.material.dispose();
+                        }
+                    }
+                }
+            });
+            extractedGLB = null;
+        }
+
+        // 2. Restore original .ply model (point cloud or splats)
+        if (loadedPointCloud) {
+            loadedPointCloud.visible = true;
+        }
+        if (viewer && viewer.splatMesh) {
+            viewer.splatMesh.visible = true;
+            viewer.forceRenderNextFrame();
+        }
+
+        // 3. Restore original lights and background
+        glbAmbientLight.visible = false;
+        glbDirectionalLight.visible = false;
+        cyanPointLight.visible = true;
+        magentaPointLight.visible = true;
+        gridHelper.visible = true;
+
+        if (isExtractModeActive) {
+            scene.background = new THREE.Color(0x010802);
+            scene.fog = new THREE.FogExp2(0x010802, 0.018);
+            if (extractGreenLight) {
+                extractGreenLight.visible = true;
+            }
+            gridHelper.material = new THREE.LineBasicMaterial({ color: 0x39ff14, opacity: 0.4, transparent: true });
+        } else {
+            scene.background = new THREE.Color(0x020204);
+            scene.fog = new THREE.FogExp2(0x020204, 0.025);
+            gridHelper.material = new THREE.LineBasicMaterial({ vertexColors: false });
+        }
+
+        // 4. Reset controls/camera
+        if (loadedPointCloud) {
+            loadedPointCloud.geometry.computeBoundingBox();
+            const center = new THREE.Vector3();
+            loadedPointCloud.geometry.boundingBox.getCenter(center);
+            controls.target.copy(center).add(loadedPointCloud.position);
+        } else {
+            controls.target.set(0, 1.0, 0);
+        }
+        camera.position.set(0, 3, 10);
+        controls.update();
+
+        btnExtractClear.classList.add('hidden');
+        logToTerminal("Extract: 3D model output cleared. Spatial scan view restored.", "info");
     });
 }
 
@@ -1777,18 +1929,62 @@ function captureSelectionSnapshot(bb) {
                 model.position.y += (targetPos.y - center.y);
                 model.position.z += (targetPos.z - center.z);
 
-                // If a model was already loaded, remove it first
-                if (loadedModel) {
-                    scene.remove(loadedModel);
+                // 1. Hide the original .ply file (splats and point cloud)
+                if (loadedPointCloud) {
+                    loadedPointCloud.visible = false;
+                }
+                if (viewer && viewer.splatMesh) {
+                    viewer.splatMesh.visible = false;
                 }
 
-                // Add newly generated mesh to the scene
+                // 2. Clear previous extracted GLB if exists
+                if (extractedGLB) {
+                    scene.remove(extractedGLB);
+                    extractedGLB.traverse(child => {
+                        if (child.isMesh) {
+                            if (child.geometry) child.geometry.dispose();
+                            if (child.material) {
+                                if (Array.isArray(child.material)) {
+                                    child.material.forEach(m => m.dispose());
+                                } else {
+                                    child.material.dispose();
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // 3. Add newly generated mesh to the scene
                 scene.add(model);
-                loadedModel = model;
+                extractedGLB = model;
+
+                // 4. Set bright white lighting and clean background
+                scene.background = new THREE.Color(0x0c0c0e);
+                scene.fog = new THREE.FogExp2(0x0c0c0e, 0.015);
+                glbAmbientLight.visible = true;
+                glbDirectionalLight.visible = true;
+
+                // Hide original cyberpunk point lights and grid
+                cyanPointLight.visible = false;
+                magentaPointLight.visible = false;
+                gridHelper.visible = false;
+                if (extractGreenLight) {
+                    extractGreenLight.visible = false;
+                }
+
+                // 5. Retarget controls camera view to the center of the extracted model
+                controls.target.copy(targetPos);
+                camera.position.copy(targetPos).add(new THREE.Vector3(0, 1.5, 4));
+                controls.update();
+
+                // Show Clear 3D button
+                if (btnExtractClear) {
+                    btnExtractClear.classList.remove('hidden');
+                }
 
                 // Hide loaders
                 hideExtractLoader();
-                logToTerminal("Extract: 3D model successfully injected at camera target.", "success");
+                logToTerminal("Extract: 3D model successfully injected in plain viewport.", "success");
 
                 // Switch back to orbit controls automatically
                 if (btnExtractOrbit) btnExtractOrbit.click();

@@ -249,6 +249,13 @@
             aria-label="Activate Selection Bounding Box Mode">
             &#x25A3; SELECT
         </button>
+
+        <!-- Button 4: Clear Extracted Model -->
+        <button id="btn-extract-clear"
+            class="btn-cyber-magenta px-4 py-2 rounded-lg text-[10px] md:text-xs uppercase font-semibold tracking-wider focus:outline-none hidden"
+            aria-label="Clear Extracted 3D Output">
+            &#x1F5D1; CLEAR 3D
+        </button>
     </div>
 
     <!-- 2D Bounding-Box Selection Canvas Overlay (injected over the 3D canvas) -->
