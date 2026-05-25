@@ -81,7 +81,7 @@ async def extract_object(req: ExtractRequest):
             f.write(transparent_bytes)
 
         # 3. Cloud TripoSR generation
-        space_name = "Pheerakarn/TripoSR"
+        space_name = "stabilityai/TripoSR"
         client = Client(space_name)
         
         result = client.predict(

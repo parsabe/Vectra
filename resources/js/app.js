@@ -1641,7 +1641,21 @@ function hideExtractLoader() {
 
 function captureSelectionSnapshot(bb) {
     try {
-        // Ensure the Three.js renderer has just rendered a frame
+        // Save current visual states to prevent visual impact on user
+        const prevBg = scene.background ? scene.background.clone() : null;
+        const prevFog = scene.fog;
+        const prevGridVisible = gridHelper.visible;
+        const prevGreenLightVisible = extractGreenLight ? extractGreenLight.visible : true;
+
+        // Temporarily set a solid white background and hide grid, fog, and green sweeping light
+        scene.background = new THREE.Color(0xffffff);
+        scene.fog = null;
+        gridHelper.visible = false;
+        if (extractGreenLight) {
+            extractGreenLight.visible = false;
+        }
+
+        // Ensure the Three.js renderer has just rendered a clean frame
         if (viewer && viewer.initialized && viewer.splatRenderReady) {
             viewer.update();
             viewer.render();
@@ -1672,6 +1686,13 @@ function captureSelectionSnapshot(bb) {
 
         if (clampedW <= 0 || clampedH <= 0) {
             console.warn('[SYSTEM] Snapshot: selection is outside the canvas bounds.');
+            // Restore original states
+            scene.background = prevBg;
+            scene.fog = prevFog;
+            gridHelper.visible = prevGridVisible;
+            if (extractGreenLight) {
+                extractGreenLight.visible = prevGreenLightVisible;
+            }
             return null;
         }
 
@@ -1685,6 +1706,22 @@ function captureSelectionSnapshot(bb) {
         offCtx.drawImage(srcCanvas, clampedX, clampedY, clampedW, clampedH, 0, 0, clampedW, clampedH);
 
         const dataURL = offCanvas.toDataURL('image/png');
+
+        // Restore original visual states immediately after capture
+        scene.background = prevBg;
+        scene.fog = prevFog;
+        gridHelper.visible = prevGridVisible;
+        if (extractGreenLight) {
+            extractGreenLight.visible = prevGreenLightVisible;
+        }
+
+        // Re-render original scene immediately so user doesn't see a white flash
+        if (viewer && viewer.initialized && viewer.splatRenderReady) {
+            viewer.update();
+            viewer.render();
+        } else {
+            renderer.render(scene, camera);
+        }
 
         console.log(
             '%c [SYSTEM] Snapshot captured in memory. ',
