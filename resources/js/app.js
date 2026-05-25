@@ -1500,10 +1500,6 @@ function drawSelectionRect(x, y, w, h) {
     if (!selCtx) return;
     selCtx.clearRect(0, 0, selectionCanvas.width, selectionCanvas.height);
 
-    // Semi-transparent fill
-    selCtx.fillStyle = SEL_FILL_COLOR;
-    selCtx.fillRect(x, y, w, h);
-
     // Glowing neon border — draw twice for bloom effect
     selCtx.lineWidth   = 1.5;
     selCtx.strokeStyle = 'rgba(57, 255, 20, 0.25)';
@@ -1516,9 +1512,10 @@ function drawSelectionRect(x, y, w, h) {
     selCtx.shadowBlur  = 8;
     selCtx.strokeRect(x, y, w, h);
 
-    // Corner handles — 4 small squares at each corner
+    // Corner handles — 4 small hollow squares at each corner (no fillRect)
+    selCtx.lineWidth   = 1;
+    selCtx.strokeStyle = SEL_STROKE_COLOR;
     selCtx.shadowBlur  = 12;
-    selCtx.fillStyle   = SEL_STROKE_COLOR;
     const c = SEL_CORNER_SIZE;
     const corners = [
         [x - c / 2, y - c / 2],
@@ -1526,7 +1523,7 @@ function drawSelectionRect(x, y, w, h) {
         [x - c / 2, y + h - c / 2],
         [x + w - c / 2, y + h - c / 2],
     ];
-    corners.forEach(([cx, cy]) => selCtx.fillRect(cx, cy, c, c));
+    corners.forEach(([cx, cy]) => selCtx.strokeRect(cx, cy, c, c));
 
     // Dimension label (safe textContent-equivalent via canvas fillText)
     selCtx.shadowBlur  = 6;
@@ -1571,9 +1568,13 @@ if (selectionCanvas) {
         const w = Math.abs(e.clientX - selBoxStart.x);
         const h = Math.abs(e.clientY - selBoxStart.y);
 
+        // Clear the green box from the 2D overlay context first so it doesn't appear in the screenshot
+        if (selCtx) {
+            selCtx.clearRect(0, 0, selectionCanvas.width, selectionCanvas.height);
+        }
+
         // Ignore trivially small (accidental click) boxes
         if (w < 8 || h < 8) {
-            if (selCtx) selCtx.clearRect(0, 0, selectionCanvas.width, selectionCanvas.height);
             return;
         }
 
@@ -1589,20 +1590,6 @@ if (selectionCanvas) {
 
         // ── Screenshot: capture the 3D canvas within selection bounds ──────
         captureSelectionSnapshot(boundingBox);
-
-        // ── DBSE Hook: filter Gaussian splats or points ────────────────────
-        if (viewer && viewer.initialized && viewer.splatRenderReady) {
-            const indices = findSplatIndicesInBox(x, y, w, h);
-            if (indices.length > 0) {
-                logToTerminal(`Isolating ${indices.length.toLocaleString()} splat nodes within volume...`, 'info');
-                updateSplatAlphas(indices, 0); // Hide splats (opacity = 0)
-                logToTerminal(`Excavation complete. ${indices.length.toLocaleString()} nodes dissolved.`, 'success');
-            } else {
-                logToTerminal(`No splats detected within volume.`, 'info');
-            }
-        } else {
-            hideSplatsInSelection(boundingBox);
-        }
     });
 
     // Cancel draw if mouse leaves the overlay area entirely
@@ -1654,15 +1641,29 @@ function hideExtractLoader() {
 
 function captureSelectionSnapshot(bb) {
     try {
+        // Ensure the Three.js renderer has just rendered a frame
+        if (viewer && viewer.initialized && viewer.splatRenderReady) {
+            viewer.update();
+            viewer.render();
+        } else {
+            renderer.render(scene, camera);
+        }
+
         // Clamp crop to canvas bounds (prevent out-of-bounds reads)
         const srcCanvas = renderer.domElement;
-        const dpr       = window.devicePixelRatio || 1;
+        
+        // Convert CSS pixels to canvas coordinate system using bounding client rect
+        const rect = srcCanvas.getBoundingClientRect();
+        const rx = bb.x - rect.left;
+        const ry = bb.y - rect.top;
 
-        // Convert CSS pixels → physical canvas pixels
-        const px = Math.round(bb.x * dpr);
-        const py = Math.round(bb.y * dpr);
-        const pw = Math.round(bb.w * dpr);
-        const ph = Math.round(bb.h * dpr);
+        const scaleX = srcCanvas.width / rect.width;
+        const scaleY = srcCanvas.height / rect.height;
+
+        const px = Math.round(rx * scaleX);
+        const py = Math.round(ry * scaleY);
+        const pw = Math.round(bb.w * scaleX);
+        const ph = Math.round(bb.h * scaleY);
 
         const clampedX = Math.max(0, Math.min(px, srcCanvas.width  - 1));
         const clampedY = Math.max(0, Math.min(py, srcCanvas.height - 1));
@@ -1774,194 +1775,4 @@ function captureSelectionSnapshot(bb) {
     }
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-//  DBSE — Deep Splat Excavation (Screen-Space Projection Engine)
-// ══════════════════════════════════════════════════════════════════════════════
 
-/**
- * hideSplatsInSelection  — DBSE Protocol
- *
- * Projects every 3D point in the loaded geometry through the camera's
- * projection matrix to find which points fall inside the drawn 2D bounding box.
- * Matching points have their colour set to fully transparent green (excavated).
- * A final statistics readout is logged to the terminal.
- *
- * @param {{ x: number, y: number, w: number, h: number }} boundingBox
- */
-function hideSplatsInSelection(boundingBox) {
-    const { x: bx, y: by, w: bw, h: bh } = boundingBox;
-
-    console.log(
-        `%c [DBSE] Excavation initiated → screen-box { x:${Math.round(bx)}, y:${Math.round(by)}, w:${Math.round(bw)}, h:${Math.round(bh)} } `,
-        'color: #ff00ff; font-weight: bold; background: #0a050a; padding: 4px 10px; border-left: 3px solid #ff00ff;'
-    );
-
-    if (!loadedModel) {
-        logToTerminal('DBSE: No spatial model loaded. Drop a .ply file first.', 'error');
-        return;
-    }
-
-    if (!loadedModel.isPoints) {
-        // For mesh geometry, use a different approach
-        logToTerminal('DBSE: Mesh geometry detected. Point-cloud mode required for excavation.', 'error');
-        return;
-    }
-
-    const geometry  = loadedModel.geometry;
-    const positions = geometry.attributes.position;
-    const colors    = geometry.attributes.color;
-
-    if (!positions) {
-        logToTerminal('DBSE: No position buffer found in geometry.', 'error');
-        return;
-    }
-
-    // Ensure we have a colour attribute to manipulate (create one if needed)
-    let colorAttr = colors;
-    if (!colorAttr) {
-        const colData = new Float32Array(positions.count * 3).fill(1.0);
-        colorAttr = new THREE.BufferAttribute(colData, 3);
-        geometry.setAttribute('color', colorAttr);
-        loadedModel.material.vertexColors = true;
-        loadedModel.material.needsUpdate = true;
-    }
-
-    // ── Screen-space projection matrix ────────────────────────────────────
-    const projMatrix = new THREE.Matrix4().multiplyMatrices(
-        camera.projectionMatrix,
-        camera.matrixWorldInverse
-    );
-    const ndcToScreen_w = window.innerWidth  / 2;
-    const ndcToScreen_h = window.innerHeight / 2;
-
-    const tmpVec = new THREE.Vector3();
-    const modelMatrix = loadedModel.matrixWorld;
-
-    let hiddenCount = 0;
-    const total = positions.count;
-
-    // ── Iterate all points and project to screen ───────────────────────────
-    for (let i = 0; i < total; i++) {
-        tmpVec.fromBufferAttribute(positions, i);
-
-        // World space
-        tmpVec.applyMatrix4(modelMatrix);
-
-        // Clip space (NDC)
-        tmpVec.applyMatrix4(projMatrix);
-
-        // Behind camera — skip
-        if (tmpVec.z > 1.0 || tmpVec.z < -1.0) continue;
-
-        // Convert NDC [-1,1] to screen pixels
-        const sx = ( tmpVec.x + 1) * ndcToScreen_w;
-        const sy = (-tmpVec.y + 1) * ndcToScreen_h;
-
-        // Test if inside bounding box
-        if (sx >= bx && sx <= bx + bw && sy >= by && sy <= by + bh) {
-            // Mark this point: set colour to dim green then hide via opacity
-            colorAttr.setXYZ(i, 0.0, 1.0, 0.08); // Briefly flash green
-            hiddenCount++;
-        }
-    }
-
-    // Commit colour changes to GPU
-    colorAttr.needsUpdate = true;
-
-    // After a brief green flash, set excavated points to black (hidden)
-    setTimeout(() => {
-        for (let i = 0; i < total; i++) {
-            tmpVec.fromBufferAttribute(positions, i);
-            tmpVec.applyMatrix4(modelMatrix);
-            tmpVec.applyMatrix4(projMatrix);
-            if (tmpVec.z > 1.0 || tmpVec.z < -1.0) continue;
-            const sx = ( tmpVec.x + 1) * ndcToScreen_w;
-            const sy = (-tmpVec.y + 1) * ndcToScreen_h;
-            if (sx >= bx && sx <= bx + bw && sy >= by && sy <= by + bh) {
-                colorAttr.setXYZ(i, 0.0, 0.0, 0.0);
-            }
-        }
-        colorAttr.needsUpdate = true;
-    }, 350);
-
-    const pct = total > 0 ? ((hiddenCount / total) * 100).toFixed(1) : '0.0';
-
-    logToTerminal(`DBSE: Excavation complete — ${hiddenCount.toLocaleString()} / ${total.toLocaleString()} nodes (${pct}%) extracted.`, 'success');
-    setExtractStatus(`EXCAVATED ${hiddenCount.toLocaleString()} NODES (${pct}%)`);
-
-    console.log(
-        `%c [DBSE] Complete: ${hiddenCount} of ${total} points (${pct}%) within selection box. `,
-        'color: #39ff14; font-weight: bold; background: #050f08; padding: 4px 10px; border-left: 3px solid #39ff14;'
-    );
-}
-
-// --- Splat Index Extraction & Visibility Modification Functions ---
-function findSplatIndicesInBox(x, y, w, h) {
-    if (!viewer || !viewer.splatMesh) return [];
-
-    const splatMesh = viewer.splatMesh;
-    const splatCount = splatMesh.getSplatCount(true);
-    const baseData = splatMesh.splatDataTextures.baseData;
-    if (!baseData || !baseData.centers) return [];
-
-    const centers = baseData.centers;
-    const selectedIndices = [];
-
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-
-    const xMin = x;
-    const xMax = x + w;
-    const yMin = y;
-    const yMax = y + h;
-
-    // Project points from 3D world space to 2D NDC and filter by selection bounding box
-    const modelViewProjectionMatrix = new THREE.Matrix4();
-    modelViewProjectionMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
-    modelViewProjectionMatrix.multiply(splatMesh.matrixWorld);
-
-    const e = modelViewProjectionMatrix.elements;
-
-    for (let i = 0; i < splatCount; i++) {
-        const cx = centers[i * 3];
-        const cy = centers[i * 3 + 1];
-        const cz = centers[i * 3 + 2];
-
-        const w_coord = e[3] * cx + e[7] * cy + e[11] * cz + e[15];
-        if (w_coord <= 0) continue;
-
-        const px = (e[0] * cx + e[4] * cy + e[8] * cz + e[12]) / w_coord;
-        const py = (e[1] * cx + e[5] * cy + e[9] * cz + e[13]) / w_coord;
-        const pz = (e[2] * cx + e[6] * cy + e[10] * cz + e[14]) / w_coord;
-
-        if (pz < -1 || pz > 1) continue;
-
-        const screenX = ((px + 1) * width) / 2;
-        const screenY = ((-py + 1) * height) / 2;
-
-        if (screenX >= xMin && screenX <= xMax && screenY >= yMin && screenY <= yMax) {
-            selectedIndices.push(i);
-        }
-    }
-
-    return selectedIndices;
-}
-
-function updateSplatAlphas(selectedIndices, alphaValue) {
-    if (!viewer || !viewer.splatMesh) return;
-    const splatMesh = viewer.splatMesh;
-    const baseData = splatMesh.splatDataTextures.baseData;
-    if (!baseData || !baseData.colors) return;
-
-    const colors = baseData.colors;
-    const val = alphaValue <= 1.0 ? Math.round(alphaValue * 255) : Math.round(alphaValue);
-    for (let i = 0; i < selectedIndices.length; i++) {
-        const idx = selectedIndices[i];
-        colors[idx * 4 + 3] = val; // Set the A channel
-    }
-
-    const splatCount = splatMesh.getSplatCount(true);
-    // Push updated CPU color buffer arrays into GPU texture buffers
-    splatMesh.updateDataTexturesFromBaseData(0, splatCount - 1);
-    viewer.forceRenderNextFrame();
-}
