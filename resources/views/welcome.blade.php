@@ -339,6 +339,91 @@
         </div>
     </div>
 
+    <!-- Creator Mode Toolbar -->
+    <div id="creator-toolbar" class="fixed bottom-8 left-1/2 -translate-x-1/2 z-[25] pointer-events-auto
+               cyber-glass-magenta px-6 py-4 rounded-2xl flex flex-col md:flex-row gap-4 items-center
+               border border-fuchsia-500/40 hidden" aria-label="Creator Mode Controls" role="toolbar">
+        <div class="flex flex-col items-start gap-0.5">
+            <span class="text-glow-magenta font-bold tracking-widest text-[9px] md:text-[11px] font-mono uppercase">CREATOR // TEXT-TO-3D</span>
+            <span id="creator-mode-status" class="text-[8px] font-mono text-fuchsia-600 tracking-wider">AWAITING LATENT PROMPT</span>
+        </div>
+        <div class="h-8 w-px bg-fuchsia-900/60 hidden md:block"></div>
+        <div class="flex items-center gap-3">
+            <input type="text" id="creator-prompt-input" 
+                   class="bg-black/50 border border-fuchsia-800/50 rounded-lg px-4 py-2 font-mono text-xs text-fuchsia-300 w-64 md:w-80 focus:outline-none focus:border-fuchsia-500 placeholder-fuchsia-700/60"
+                   placeholder="Describe your 3D asset (e.g. cyberpunk katana)...">
+            <button id="btn-creator-summon"
+                class="btn-cyber-magenta px-4 py-2 rounded-lg text-[10px] md:text-xs uppercase font-semibold tracking-wider focus:outline-none">
+                &#x2728; SUMMON
+            </button>
+            <button id="btn-creator-config-toggle"
+                class="bg-fuchsia-950/40 hover:bg-fuchsia-900/40 border border-fuchsia-800/40 text-fuchsia-400 p-2 rounded-lg text-sm transition-all focus:outline-none"
+                title="Configure API Credentials">
+                &#x2699;
+            </button>
+            <button id="btn-creator-abort"
+                class="btn-cyber-red px-3 py-2 rounded-lg text-[10px] md:text-xs uppercase font-semibold tracking-wider focus:outline-none">
+                &#x2715; CLOSE
+            </button>
+        </div>
+    </div>
+
+    <!-- Credentials Config Panel -->
+    <div id="creator-config-panel" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[30] pointer-events-auto
+               cyber-glass p-6 rounded-2xl flex flex-col gap-4 border border-cyan-500/40 hidden w-96 max-w-full">
+        <header class="border-b border-cyan-900/50 pb-2 flex justify-between items-center">
+            <span class="text-glow-cyan font-bold tracking-widest text-xs font-mono uppercase">VECTRA // PROTOCOL_CONFIG</span>
+            <button id="btn-config-close" class="text-cyan-500 hover:text-cyan-300 font-mono text-sm focus:outline-none">&#x2715;</button>
+        </header>
+        
+        <div class="flex flex-col gap-3 font-mono text-xs">
+            <div class="flex flex-col gap-1">
+                <label for="cfg-engine-url" class="text-cyan-500 uppercase tracking-wider text-[9px]">LOCAL_ENGINE_URL (3D FORGE)</label>
+                <input type="text" id="cfg-engine-url" 
+                       class="bg-black/60 border border-cyan-800/50 rounded px-3 py-2 text-cyan-300 focus:outline-none focus:border-cyan-500" 
+                       placeholder="http://127.0.0.1:8001">
+            </div>
+            
+            <div class="flex flex-col gap-1 mt-1">
+                <label for="cfg-fal-key" class="text-cyan-500 uppercase tracking-wider text-[9px]">FAL_KEY (FAL.AI SD3.5)</label>
+                <input type="password" id="cfg-fal-key" 
+                       class="bg-black/60 border border-cyan-800/50 rounded px-3 py-2 text-cyan-300 focus:outline-none focus:border-cyan-500" 
+                       placeholder="Enter Fal.ai API key...">
+                <span id="cfg-fal-status" class="text-[8px] text-cyan-700">Checking status...</span>
+            </div>
+            
+            <div class="flex flex-col gap-1 mt-1">
+                <label for="cfg-replicate-key" class="text-cyan-500 uppercase tracking-wider text-[9px]">REPLICATE_API_TOKEN (SD3)</label>
+                <input type="password" id="cfg-replicate-key" 
+                       class="bg-black/60 border border-cyan-800/50 rounded px-3 py-2 text-cyan-300 focus:outline-none focus:border-cyan-500" 
+                       placeholder="Enter Replicate API token...">
+                <span id="cfg-replicate-status" class="text-[8px] text-cyan-700">Checking status...</span>
+            </div>
+        </div>
+        
+        <div class="flex gap-3 mt-2">
+            <button id="btn-config-save" class="btn-cyber-cyan w-full py-2.5 rounded font-semibold text-xs uppercase tracking-widest focus:outline-none">
+                [SAVE CONFIGURATION]
+            </button>
+        </div>
+    </div>
+
+    <!-- Loading Overlay for Summoning (Text-to-3D) -->
+    <div id="creator-loading-overlay"
+        class="fixed inset-0 z-30 bg-black/90 flex flex-col justify-center items-center gap-4 hidden pointer-events-auto font-mono text-xs text-fuchsia-400">
+        <div
+            class="w-12 h-12 border-2 border-t-fuchsia-400 border-r-transparent border-b-fuchsia-400 border-l-transparent rounded-full animate-spin shadow-[0_0_15px_rgba(240,46,170,0.3)]">
+        </div>
+        <div id="creator-loading-text" class="text-glow-magenta uppercase tracking-widest mt-2 text-center px-4">
+            Initializing Latent summoning...
+        </div>
+        <div class="w-64 bg-fuchsia-950/40 h-2 rounded-full overflow-hidden border border-fuchsia-700/30">
+            <div id="creator-loading-bar-fill"
+                class="bg-fuchsia-400 h-full w-[0%] transition-all duration-100 shadow-[0_0_8px_#ff00ff]"></div>
+        </div>
+        <div id="creator-loading-percent" class="text-[10px] text-fuchsia-500">0% Loaded</div>
+    </div>
+
 </body>
 
 </html>

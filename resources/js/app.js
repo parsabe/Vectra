@@ -214,7 +214,7 @@ scene.add(glbDirectionalLight);
 
 // --- Custom Cyberpunk Grid and Wireframe Corridor ---
 // Horizontal grid at the bottom
-const gridHelper = new THREE.GridHelper(120, 60, 0xff00ff, 0x00f3ff);
+let gridHelper = new THREE.GridHelper(120, 60, 0xff00ff, 0x00f3ff);
 gridHelper.position.y = -1.5;
 scene.add(gridHelper);
 
@@ -1160,10 +1160,7 @@ if (btnToggleSplatting) {
 // --- Main Menu Buttons binding ---
 if (btnCreator) {
     btnCreator.addEventListener('click', () => {
-        logConsoleSystem(2, 'Creator Mode');
-        logToTerminal('Protocol 2 Initiated: Creator Mode...', 'info');
-        logToTerminal('Text-to-3D neural network initialized.', 'success');
-        logToTerminal('SYS_STATUS: Awaiting latent diffusion prompt input...', 'info');
+        activateCreatorMode();
     });
 }
 
@@ -1449,6 +1446,7 @@ function deactivateExtractMode() {
     newGrid.position.y = -1.5;
     scene.remove(gridHelper);
     scene.add(newGrid);
+    gridHelper = newGrid;
 
     // Restore orbit controls
     controls.enabled = true;
@@ -2006,6 +2004,384 @@ function captureSelectionSnapshot(bb) {
         logToTerminal('SYS_ERR: Snapshot capture failed. Check console.', 'error');
         return null;
     }
+}
+
+// ============================================================================
+// ── CREATOR MODE (TEXT-TO-3D PROTOCOL) IMPLEMENTATION ──────────────────────
+// ============================================================================
+
+// --- State Variables ---
+let isCreatorModeActive = false;
+let creatorSceneOriginalFog = null;
+let creatorSceneOriginalBg = null;
+let creatorFuchsiaLight = null;
+
+// --- DOM Elements ---
+const creatorToolbar = document.getElementById('creator-toolbar');
+const creatorPromptInput = document.getElementById('creator-prompt-input');
+const btnCreatorSummon = document.getElementById('btn-creator-summon');
+const btnCreatorConfigToggle = document.getElementById('btn-creator-config-toggle');
+const btnCreatorAbort = document.getElementById('btn-creator-abort');
+const creatorModeStatus = document.getElementById('creator-mode-status');
+
+const creatorConfigPanel = document.getElementById('creator-config-panel');
+const btnConfigClose = document.getElementById('btn-config-close');
+const cfgEngineUrl = document.getElementById('cfg-engine-url');
+const cfgFalKey = document.getElementById('cfg-fal-key');
+const cfgFalStatus = document.getElementById('cfg-fal-status');
+const cfgReplicateKey = document.getElementById('cfg-replicate-key');
+const cfgReplicateStatus = document.getElementById('cfg-replicate-status');
+const btnConfigSave = document.getElementById('btn-config-save');
+
+const creatorLoadingOverlay = document.getElementById('creator-loading-overlay');
+const creatorLoadingText = document.getElementById('creator-loading-text');
+const creatorLoadingBarFill = document.getElementById('creator-loading-bar-fill');
+const creatorLoadingPercent = document.getElementById('creator-loading-percent');
+
+// --- Helper: Loader ---
+function showCreatorLoader(text, percent) {
+    if (creatorLoadingOverlay && creatorLoadingText && creatorLoadingBarFill && creatorLoadingPercent) {
+        creatorLoadingOverlay.classList.remove('hidden');
+        creatorLoadingText.textContent = text;
+        creatorLoadingBarFill.style.width = `${percent}%`;
+        creatorLoadingPercent.textContent = `${percent}%`;
+    }
+}
+
+function hideCreatorLoader() {
+    if (creatorLoadingOverlay) {
+        creatorLoadingOverlay.classList.add('hidden');
+    }
+}
+
+// --- Mode Activation / Deactivation ---
+function activateCreatorMode() {
+    if (isCreatorModeActive) return;
+    isCreatorModeActive = true;
+
+    // Automatically deactivate Extract Mode if active
+    if (typeof isExtractModeActive !== 'undefined' && isExtractModeActive) {
+        deactivateExtractMode();
+    }
+
+    logConsoleSystem(2, 'Creator Mode (Text-to-3D Protocol)');
+    logToTerminal('Protocol 2 Initiated: Creator Mode (VPS Gateway Proxy)...', 'info');
+    logToTerminal('Creator Mode panel active. Ready to summon 3D assets.', 'info');
+
+    // ── Visual Transformation ──
+    creatorSceneOriginalFog = scene.fog ? { color: scene.fog.color.clone(), density: scene.fog.density } : null;
+    creatorSceneOriginalBg = scene.background ? scene.background.clone() : null;
+
+    // Shift to fuchsia tint
+    scene.background = new THREE.Color(0x0a0108);
+    scene.fog = new THREE.FogExp2(0x0a0108, 0.018);
+
+    // Fuchsia point light
+    creatorFuchsiaLight = new THREE.PointLight(0xff00ff, 4, 40);
+    creatorFuchsiaLight.position.set(0, 5, 0);
+    scene.add(creatorFuchsiaLight);
+
+    // Tint grid to fuchsia
+    if (gridHelper) {
+        gridHelper.material = new THREE.LineBasicMaterial({ color: 0xff00ff, opacity: 0.4, transparent: true });
+    }
+
+    // Enable orbit controls
+    controls.enabled = true;
+    controls.maxPolarAngle = Math.PI;
+
+    // Fade out main UI
+    fadeOutMainUI();
+
+    // Show Creator Toolbar
+    if (creatorToolbar) {
+        creatorToolbar.classList.remove('hidden');
+        if (creatorPromptInput) {
+            creatorPromptInput.value = '';
+            creatorPromptInput.focus();
+        }
+    }
+
+    // Refresh credentials status display
+    fetchConfigStatus();
+}
+
+function deactivateCreatorMode() {
+    if (!isCreatorModeActive) return;
+    isCreatorModeActive = false;
+
+    // Restore scene visuals
+    if (creatorSceneOriginalBg) {
+        scene.background = creatorSceneOriginalBg;
+    } else {
+        scene.background = new THREE.Color(0x020204);
+    }
+    if (creatorSceneOriginalFog) {
+        scene.fog = new THREE.FogExp2(creatorSceneOriginalFog.color.getHex(), creatorSceneOriginalFog.density);
+    } else {
+        scene.fog = new THREE.FogExp2(0x020204, 0.025);
+    }
+
+    // Remove fuchsia light
+    if (creatorFuchsiaLight) {
+        scene.remove(creatorFuchsiaLight);
+        creatorFuchsiaLight.dispose();
+        creatorFuchsiaLight = null;
+    }
+
+    // Restore grid
+    if (gridHelper) {
+        gridHelper.material = new THREE.LineBasicMaterial({ vertexColors: false });
+        gridHelper.geometry.dispose();
+        const newGrid = new THREE.GridHelper(120, 60, 0xff00ff, 0x00f3ff);
+        newGrid.position.y = -1.5;
+        scene.remove(gridHelper);
+        scene.add(newGrid);
+        gridHelper = newGrid;
+    }
+
+    // Hide toolbar and config
+    if (creatorToolbar) creatorToolbar.classList.add('hidden');
+    if (creatorConfigPanel) creatorConfigPanel.classList.add('hidden');
+
+    // Fade main UI back in
+    setTimeout(() => {
+        fadeInMainUI();
+        logToTerminal('Creator Mode exited. Back to Spatial Command Core.', 'info');
+    }, 300);
+}
+
+// --- Config Management ---
+function fetchConfigStatus() {
+    fetch('/api-proxy/api/config')
+        .then(res => res.json())
+        .then(data => {
+            if (cfgEngineUrl) cfgEngineUrl.value = data.local_engine_url || 'http://127.0.0.1:8001';
+            
+            if (cfgFalStatus) {
+                if (data.fal_key_configured) {
+                    cfgFalStatus.textContent = `Status: Active (${data.fal_key_masked})`;
+                    cfgFalStatus.className = 'text-[8px] text-green-400';
+                } else {
+                    cfgFalStatus.textContent = 'Status: Not Configured';
+                    cfgFalStatus.className = 'text-[8px] text-red-500';
+                }
+            }
+            if (cfgReplicateStatus) {
+                if (data.replicate_key_configured) {
+                    cfgReplicateStatus.textContent = `Status: Active (${data.replicate_key_masked})`;
+                    cfgReplicateStatus.className = 'text-[8px] text-green-400';
+                } else {
+                    cfgReplicateStatus.textContent = 'Status: Not Configured';
+                    cfgReplicateStatus.className = 'text-[8px] text-red-500';
+                }
+            }
+            
+            // Log active status to terminal
+            let activeGenerators = [];
+            if (data.fal_key_configured) activeGenerators.push('Fal.ai');
+            if (data.replicate_key_configured) activeGenerators.push('Replicate');
+            
+            if (activeGenerators.length > 0) {
+                logToTerminal(`System: Connected to SD3 via ${activeGenerators.join(' & ')}.`, 'success');
+            } else {
+                logToTerminal('System warning: No SD3 API credentials configured. Click settings gear.', 'error');
+            }
+        })
+        .catch(err => {
+            console.error('Error fetching config status:', err);
+            logToTerminal('SYS_ERR: Failed to retrieve gateway configuration.', 'error');
+        });
+}
+
+function saveConfig() {
+    const payload = {
+        local_engine_url: cfgEngineUrl ? cfgEngineUrl.value.trim() : null,
+        fal_key: cfgFalKey && cfgFalKey.value.trim() ? cfgFalKey.value.trim() : null,
+        replicate_key: cfgReplicateKey && cfgReplicateKey.value.trim() ? cfgReplicateKey.value.trim() : null
+    };
+    
+    fetch('/api-proxy/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+    })
+    .then(data => {
+        logToTerminal('Protocol config updated successfully!', 'success');
+        if (creatorConfigPanel) creatorConfigPanel.classList.add('hidden');
+        if (cfgFalKey) cfgFalKey.value = '';
+        if (cfgReplicateKey) cfgReplicateKey.value = '';
+        fetchConfigStatus();
+    })
+    .catch(err => {
+        console.error('Error saving config:', err);
+        logToTerminal(`SYS_ERR: Config save failed: ${err.message}`, 'error');
+    });
+}
+
+// --- Summon Pipeline ---
+function executePromptSummon() {
+    if (!creatorPromptInput) return;
+    const prompt = creatorPromptInput.value.trim();
+    if (!prompt) {
+        logToTerminal('SYS_ERR: Prompt cannot be empty.', 'error');
+        return;
+    }
+    
+    logToTerminal(`Summon Protocol initiated: "${prompt}"`, 'info');
+    showCreatorLoader('Connecting to Stable Diffusion SD3 generator...', 15);
+    
+    fetch('/api-proxy/summon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: prompt })
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(errData => {
+                throw new Error(errData.detail || errData.status || `HTTP ${response.status}`);
+            }).catch(e => {
+                throw new Error(`HTTP ${response.status}: ${response.statusText || 'Server Error'}`);
+            });
+        }
+        showCreatorLoader('Image generated. Forging 3D geometry locally via TripoSR...', 55);
+        logToTerminal('Summon: SD3 image generated. Beginning local TripoSR mesh extraction...');
+        return response.arrayBuffer();
+    })
+    .then(arrayBuffer => {
+        showCreatorLoader('Reconstruction complete. Loading 3D spatial mesh...', 85);
+        logToTerminal('Summon: Mesh extraction complete. Compiling model...');
+        
+        const loader = new GLTFLoader();
+        loader.parse(arrayBuffer, '', (gltf) => {
+            const model = gltf.scene;
+            
+            // Set scale and position (centered, matching extract flow)
+            const forward = new THREE.Vector3();
+            camera.getWorldDirection(forward);
+            const targetPos = new THREE.Vector3().copy(camera.position).addScaledVector(forward, 5);
+            model.position.copy(targetPos);
+            
+            const box = new THREE.Box3().setFromObject(model);
+            const size = new THREE.Vector3();
+            box.getSize(size);
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const scale = 3.5 / maxDim;
+            model.scale.set(scale, scale, scale);
+            
+            const center = new THREE.Vector3();
+            box.getCenter(center);
+            model.position.x += (targetPos.x - center.x);
+            model.position.y += (targetPos.y - center.y);
+            model.position.z += (targetPos.z - center.z);
+            
+            // Hide existing clouds/splats
+            if (loadedPointCloud) loadedPointCloud.visible = false;
+            if (viewer && viewer.splatMesh) viewer.splatMesh.visible = false;
+            
+            // Clear previous extracted GLB
+            if (extractedGLB) {
+                scene.remove(extractedGLB);
+                extractedGLB.traverse(child => {
+                    if (child.isMesh) {
+                        if (child.geometry) child.geometry.dispose();
+                        if (child.material) {
+                            if (Array.isArray(child.material)) {
+                                child.material.forEach(m => m.dispose());
+                            } else {
+                                child.material.dispose();
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // Inject new mesh
+            scene.add(model);
+            extractedGLB = model;
+            
+            // Set lighting and background for viewing
+            scene.background = new THREE.Color(0x0c0c0e);
+            scene.fog = new THREE.FogExp2(0x0c0c0e, 0.015);
+            glbAmbientLight.visible = true;
+            glbDirectionalLight.visible = true;
+            
+            cyanPointLight.visible = false;
+            magentaPointLight.visible = false;
+            gridHelper.visible = false;
+            if (creatorFuchsiaLight) creatorFuchsiaLight.visible = false;
+            
+            // Update camera/controls
+            controls.target.copy(targetPos);
+            camera.position.copy(targetPos).add(new THREE.Vector3(0, 1.5, 4));
+            controls.update();
+            
+            // Show Clear 3D button
+            const btnClear = document.getElementById('btn-extract-clear');
+            if (btnClear) btnClear.classList.remove('hidden');
+            
+            hideCreatorLoader();
+            logToTerminal(`Summon: Model "${prompt}" successfully rendered!`, 'success');
+            
+            // Deactivate creator toolbar
+            deactivateCreatorMode();
+        }, (err) => {
+            throw new Error(`GLTF parser error: ${err.message}`);
+        });
+    })
+    .catch(err => {
+        console.error(err);
+        hideCreatorLoader();
+        logToTerminal(`SYS_ERR: Summon failed: ${err.message}`, 'error');
+    });
+}
+
+// --- Event Bindings ---
+if (btnCreatorAbort) {
+    btnCreatorAbort.addEventListener('click', () => {
+        deactivateCreatorMode();
+    });
+}
+
+if (btnCreatorConfigToggle) {
+    btnCreatorConfigToggle.addEventListener('click', () => {
+        if (creatorConfigPanel) {
+            creatorConfigPanel.classList.toggle('hidden');
+            if (!creatorConfigPanel.classList.contains('hidden')) {
+                fetchConfigStatus();
+            }
+        }
+    });
+}
+
+if (btnConfigClose) {
+    btnConfigClose.addEventListener('click', () => {
+        if (creatorConfigPanel) creatorConfigPanel.classList.add('hidden');
+    });
+}
+
+if (btnConfigSave) {
+    btnConfigSave.addEventListener('click', () => {
+        saveConfig();
+    });
+}
+
+if (btnCreatorSummon) {
+    btnCreatorSummon.addEventListener('click', () => {
+        executePromptSummon();
+    });
+}
+
+if (creatorPromptInput) {
+    creatorPromptInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            executePromptSummon();
+        }
+    });
 }
 
 
