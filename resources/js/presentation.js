@@ -6,7 +6,7 @@ import { ScrollToPlugin } from 'gsap/ScrollToPlugin';
 // Register GSAP plugins
 gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
 
-console.log('%c[VECTRA PRESENTATION] Initializing Saturn 3D Snapping Engine...', 'color: #00f3ff; font-weight: bold;');
+console.log('%c[VECTRA PRESENTATION] Booting 7-Stage Saturn Scrollytelling Engine...', 'color: #00f3ff; font-weight: bold;');
 
 // DOM Elements
 const canvas = document.getElementById('webgl-canvas');
@@ -15,7 +15,6 @@ if (!canvas) {
 }
 
 // ── Lenis Smooth Scrolling Setup ─────────────────────────────────────────────
-// Setup Lenis to work alongside snapping layout
 const lenis = new Lenis({
     duration: 1.2,
     easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
@@ -40,7 +39,7 @@ gsap.ticker.lagSmoothing(0);
 // ── Three.js Scene Configuration ─────────────────────────────────────────────
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x020204);
-scene.fog = new THREE.FogExp2(0x020204, 0.022); // deep space volumetric fog
+scene.fog = new THREE.FogExp2(0x020204, 0.022); // Volumetric space depth fog
 
 // Camera setup
 const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 500);
@@ -86,7 +85,6 @@ const starGeometry = new THREE.BufferGeometry();
 const starPositions = new Float32Array(starCount * 3);
 
 for (let i = 0; i < starCount; i++) {
-    // Distribute stars in a large hollow sphere
     const radius = 120 + Math.random() * 80;
     const u = Math.random();
     const v = Math.random();
@@ -205,7 +203,7 @@ for (let i = 0; i < 3; i++) {
     });
 }
 
-// ── GSAP ScrollTrigger Camera Flight Mapping ──────────────────────────────────
+// ── GSAP ScrollTrigger 7-Phase Flight Path Mapping ────────────────────────────
 // Initial camera placement
 camera.position.set(0, 0, 9.5);
 cameraTarget.set(0, 0, 0);
@@ -215,39 +213,101 @@ const scrollTimeline = gsap.timeline({
         trigger: 'body',
         start: 'top top',
         end: 'bottom bottom',
-        scrub: 1.5, // Smooth lag multiplier
+        scrub: 1.6, // Smooth lag multiplier
     }
 });
 
-// Coordinate mappings:
-// Slide 1 (Hero): Camera (0, 0, 9.5) looking at (0, 0, 0)
-// Slide 2 (Related Work): Camera (-4.2, 0.4, 7.8) looking at (1.5, 0, -1) (Planet shifts to right side)
-// Slide 3 (Methodology): Camera (-2.8, 2.0, 5.6) looking at (1.6, -0.4, -2) (Dramatic rings angle)
-// Slide 4 (Conclusion): Camera (0, 0, 11.5) looking at (0, 0, 0) (Planet retreats centered)
+// Coordinate mappings for 7 sections:
+// Phase 1 (Hero to Related Work): zooms inside rings at (-3.2, 0.4, 4.5)
+// Phase 2 (Related Work to Methodology): orbits side of planet at (-5.2, 2.5, 7.8)
+// Phase 3 (Methodology to Experiments): orbits close to a moon at (2.5, -1.8, 5.0)
+// Phase 4 (Experiments to Discussion): crosses the ring plane at (4.5, -0.8, -4.5)
+// Phase 5 (Discussion to Conclusion): pulls back to a distant centered shot at (0, 0.2, 12.5)
+// Phase 6 (Conclusion to References): orbits up looking down at the planet at (0, 4.2, 9.5)
 
 scrollTimeline
-    // ── Phase 1: Slide 1 -> Slide 2
-    .to(camera.position, { x: -4.2, y: 0.4, z: 7.8, ease: 'power1.inOut' }, 0)
-    .to(cameraTarget, { x: 1.5, y: 0, z: -1, ease: 'power1.inOut' }, 0)
+    // ── Phase 1: Slide 1 -> Slide 2 (Hero to Related Work)
+    .to(camera.position, { x: -3.2, y: 0.4, z: 4.5, ease: 'power1.inOut' }, 0)
+    .to(cameraTarget, { x: 1.5, y: -0.2, z: 0, ease: 'power1.inOut' }, 0)
     .to(planetGroup.rotation, { y: Math.PI * 0.45, ease: 'power1.inOut' }, 0)
     .to(cyanLight, { intensity: 1, ease: 'power1.inOut' }, 0)
     .to(magentaLight, { intensity: 7, ease: 'power1.inOut' }, 0)
     
-    // ── Phase 2: Slide 2 -> Slide 3
-    .to(camera.position, { x: -2.8, y: 2.0, z: 5.6, ease: 'power1.inOut' }, 1)
-    .to(cameraTarget, { x: 1.6, y: -0.4, z: -2, ease: 'power1.inOut' }, 1)
+    // ── Phase 2: Slide 2 -> Slide 3 (Related Work to Methodology)
+    .to(camera.position, { x: -5.2, y: 2.5, z: 7.8, ease: 'power1.inOut' }, 1)
+    .to(cameraTarget, { x: 2.0, y: -0.6, z: -1, ease: 'power1.inOut' }, 1)
     .to(planetGroup.rotation, { y: Math.PI * 0.9, x: 0.52, ease: 'power1.inOut' }, 1)
     .to(magentaLight, { intensity: 1, ease: 'power1.inOut' }, 1)
     .to(yellowLight, { intensity: 7, ease: 'power1.inOut' }, 1)
     
-    // ── Phase 3: Slide 3 -> Slide 4
-    .to(camera.position, { x: 0, y: 0, z: 11.5, ease: 'power1.inOut' }, 2)
-    .to(cameraTarget, { x: 0, y: 0, z: 0, ease: 'power1.inOut' }, 2)
-    .to(planetGroup.rotation, { y: Math.PI * 1.4, x: 0.35, ease: 'power1.inOut' }, 2)
+    // ── Phase 3: Slide 3 -> Slide 4 (Methodology to Experiments)
+    .to(camera.position, { x: 2.5, y: -1.8, z: 5.0, ease: 'power1.inOut' }, 2)
+    .to(cameraTarget, { x: -1.5, y: 0.5, z: 0.5, ease: 'power1.inOut' }, 2)
+    .to(planetGroup.rotation, { y: Math.PI * 1.3, x: 0.22, ease: 'power1.inOut' }, 2)
     .to(yellowLight, { intensity: 1, ease: 'power1.inOut' }, 2)
-    .to(cyanLight, { intensity: 6, ease: 'power1.inOut' }, 2);
+    .to(cyanLight, { intensity: 6, ease: 'power1.inOut' }, 2)
 
-// Update Scroll Progress bar
+    // ── Phase 4: Slide 4 -> Slide 5 (Experiments to Discussion)
+    .to(camera.position, { x: 4.5, y: -0.8, z: -4.5, ease: 'power1.inOut' }, 3)
+    .to(cameraTarget, { x: -2.0, y: 0.4, z: 1, ease: 'power1.inOut' }, 3)
+    .to(planetGroup.rotation, { y: Math.PI * 1.8, x: -0.15, ease: 'power1.inOut' }, 3)
+    .to(cyanLight, { intensity: 1, ease: 'power1.inOut' }, 3)
+    .to(magentaLight, { intensity: 7, ease: 'power1.inOut' }, 3)
+
+    // ── Phase 5: Slide 5 -> Slide 6 (Discussion to Conclusion)
+    .to(camera.position, { x: 0, y: 0.2, z: 12.5, ease: 'power1.inOut' }, 4)
+    .to(cameraTarget, { x: 0, y: 0, z: 0, ease: 'power1.inOut' }, 4)
+    .to(planetGroup.rotation, { y: Math.PI * 2.3, x: 0.35, ease: 'power1.inOut' }, 4)
+    .to(magentaLight, { intensity: 1, ease: 'power1.inOut' }, 4)
+    .to(cyanLight, { intensity: 6, ease: 'power1.inOut' }, 4)
+
+    // ── Phase 6: Slide 6 -> Slide 7 (Conclusion to References)
+    .to(camera.position, { x: 0, y: 4.2, z: 9.5, ease: 'power1.inOut' }, 5)
+    .to(cameraTarget, { x: 0, y: 0, z: -0.5, ease: 'power1.inOut' }, 5)
+    .to(planetGroup.rotation, { y: Math.PI * 2.8, x: 0.45, ease: 'power1.inOut' }, 5)
+    .to(cyanLight, { intensity: 4, ease: 'power1.inOut' }, 5)
+    .to(yellowLight, { intensity: 5, ease: 'power1.inOut' }, 5);
+
+// ── Large Figures Zoom-In & Zoom-Out on Scroll ──────────────────────────────
+const sections = document.querySelectorAll('section');
+sections.forEach((section, i) => {
+    const zoomContainer = section.querySelector('.zoom-image-container');
+    if (zoomContainer) {
+        const img = zoomContainer.querySelector('.zoom-image');
+        if (img) {
+            // Entry zoom-in
+            gsap.fromTo(img,
+                { scale: 0.35, opacity: 0.05 },
+                {
+                    scale: 1.12,
+                    opacity: 1,
+                    scrollTrigger: {
+                        trigger: section,
+                        start: 'top 85%',
+                        end: 'top 25%',
+                        scrub: true
+                    }
+                }
+            );
+
+            // Exit zoom-out (except for references action card)
+            if (i < sections.length - 1) {
+                gsap.to(img, {
+                    scale: 0.35,
+                    opacity: 0.05,
+                    scrollTrigger: {
+                        trigger: section,
+                        start: 'bottom 75%',
+                        end: 'bottom 15%',
+                        scrub: true
+                    }
+                });
+            }
+        }
+    }
+});
+
+// Update Scroll Progress bar and Nav dots
 window.addEventListener('scroll', () => {
     const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
     if (scrollHeight > 0) {
@@ -255,6 +315,16 @@ window.addEventListener('scroll', () => {
         const progressBar = document.getElementById('scroll-progress');
         if (progressBar) {
             progressBar.style.width = `${scrollPercent}%`;
+        }
+
+        // Highlight current nav dot
+        const currentSlide = Math.round(window.scrollY / window.innerHeight);
+        for (let i = 0; i < 7; i++) {
+            const dot = document.getElementById(`dot-${i}`);
+            if (dot) {
+                if (i === currentSlide) dot.classList.add('active');
+                else dot.classList.remove('active');
+            }
         }
     }
 });
@@ -309,7 +379,6 @@ function selectFormula(index) {
     const formula = formulasData[index];
     if (!formula) return;
 
-    // Toggle active classes on tab elements
     for (let i = 0; i < formulasData.length; i++) {
         const tab = document.getElementById(`f-tab-${i}`);
         if (tab) {
@@ -325,33 +394,27 @@ function selectFormula(index) {
 
     if (!container || !figImg || !figCap || !figContainer) return;
 
-    // Smooth transition: fade out, update, fade in
     gsap.to([container, figContainer], {
         opacity: 0.05,
         duration: 0.2,
         onComplete: () => {
-            // Clear old elements safely
             container.replaceChildren();
 
-            // Append Title
             const titleNode = document.createElement('h3');
             titleNode.className = 'font-mono text-sm text-cyan-400 font-bold uppercase mb-2 tracking-widest text-glow-cyan';
             titleNode.textContent = formula.title;
             container.appendChild(titleNode);
 
-            // Append Description
             const descNode = document.createElement('p');
             descNode.className = 'leading-relaxed text-neutral-300 text-xs md:text-sm mb-4 font-sans';
             descNode.textContent = formula.desc;
             container.appendChild(descNode);
 
-            // Append Formula 1
             const mathBlock1 = document.createElement('div');
             mathBlock1.className = 'my-4 p-3 rounded-lg bg-black/45 border border-cyan-900/10 text-center';
             katex.render(formula.eq1, mathBlock1, { displayMode: true, throwOnError: false });
             container.appendChild(mathBlock1);
 
-            // Append Formula 2 (if exists)
             if (formula.eq2) {
                 const mathBlock2 = document.createElement('div');
                 mathBlock2.className = 'my-4 p-3 rounded-lg bg-black/45 border border-cyan-900/10 text-center';
@@ -359,11 +422,9 @@ function selectFormula(index) {
                 container.appendChild(mathBlock2);
             }
 
-            // Update Image
             figImg.setAttribute('src', formula.fig);
             figCap.textContent = formula.caption;
 
-            // Fade back in
             gsap.to([container, figContainer], { opacity: 1, duration: 0.3 });
         }
     });
@@ -380,7 +441,7 @@ const scenariosData = {
     create: {
         text: "<strong>Scenario 2 (Local Summoning Engine)</strong> maps semantic text prompts directly to meshes on tight GPU parameters (8GB VRAM RTX 4060). SDXL-Lightning loads first to generate a half-precision (float16) 2D pixel canvas. Critically, to prevent VRAM allocation overflows, the SDXL memory cache is aggressively purged (<code>torch.cuda.empty_cache()</code>) before TripoSR boots into memory to run the Marching Cubes volumetric forge.",
         nodes: ['node-input', 'node-forge', 'node-inject'],
-        paths: ['flow-path-1', 'flow-path-2'], // highlights path bypassing Segment/DBSE
+        paths: ['flow-path-1', 'flow-path-2'],
         legend: "Interactive telemetry: Parses text prompt -> SDXL-Lightning image generation -> Aggressive memory cache flush -> TripoSR volumetric forging -> Injects GLB mesh directly to physics terminal."
     }
 };
@@ -397,7 +458,6 @@ function selectScenario(key) {
     const data = scenariosData[key];
     if (!data) return;
 
-    // Toggle button active classes
     const btnExtract = document.getElementById('scen-btn-extract');
     const btnCreate = document.getElementById('scen-btn-create');
     if (key === 'extract') {
@@ -418,7 +478,6 @@ function selectScenario(key) {
         legendText.textContent = data.legend;
     }
 
-    // Highlight flowchart nodes
     const allNodes = ['node-input', 'node-segment', 'node-forge', 'node-dbse', 'node-inject'];
     allNodes.forEach(nodeId => {
         const el = document.getElementById(nodeId);
@@ -436,7 +495,6 @@ function selectScenario(key) {
         }
     });
 
-    // Highlight SVG paths
     const allPaths = ['flow-path-1', 'flow-path-2', 'flow-path-3', 'flow-path-4', 'flow-path-5'];
     allPaths.forEach(pathId => {
         const pathEl = document.getElementById(pathId);
@@ -462,7 +520,6 @@ function scrollToSection(selector) {
     });
 }
 
-// Bind interactive event listeners for flowchart nodes
 function initFlowchartEvents() {
     const allNodes = ['node-input', 'node-segment', 'node-forge', 'node-dbse', 'node-inject'];
     const legendText = document.getElementById('flow-node-details');
@@ -480,7 +537,6 @@ function initFlowchartEvents() {
             nodeEl.addEventListener('mouseleave', () => {
                 if (legendText) {
                     legendText.style.color = "";
-                    // Restore current active scenario default description
                     const activeBtn = document.querySelector('.px-3.py-1.5.rounded.border.active');
                     if (activeBtn) {
                         const key = activeBtn.id === 'scen-btn-extract' ? 'extract' : 'create';
@@ -521,7 +577,6 @@ function animate() {
         const x = Math.cos(moon.angle) * moon.radius;
         const z = Math.sin(moon.angle) * moon.radius;
         
-        // Match the planet group tilt in coordinate space
         const pos = new THREE.Vector3(x, 0, z);
         pos.applyAxisAngle(new THREE.Vector3(1, 0, 0), 0.35); // matches x rotation
         pos.applyAxisAngle(new THREE.Vector3(0, 0, 1), 0.12); // matches z rotation
