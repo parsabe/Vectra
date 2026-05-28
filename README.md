@@ -1,58 +1,137 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+<div align="center">
+  
+  <br>
+  <font size="6"><b>VECTRA // SPATIAL_CORE</b></font>
+  <br><br>
+  <p><b>Applied AI Security Frameworks & Generative 3D Spatial Computing</b></p>
+
+  <p>
+    <a href="#abstract">Abstract</a> •
+    <a href="#video-demonstration">Video Demo</a> •
+    <a href="#introduction">Introduction</a> •
+    <a href="#system-architecture">Architecture</a> •
+    <a href="#hardware-requirements">Requirements</a>
+  </p>
+
+  <br>
+  
+  <img src="https://img.shields.io/badge/Python-3.10+-blue?logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/Three.js-WebGL-black?logo=three.js&logoColor=white" alt="Three.js">
+  <img src="https://img.shields.io/badge/FastAPI-Backend-009688?logo=fastapi&logoColor=white" alt="FastAPI">
+  <img src="https://img.shields.io/badge/VRAM-8GB_Max-ff00ff?logo=nvidia&logoColor=white" alt="VRAM">
+
+  <br><br>
+</div>
+
+## Abstract
+
+<p>As spatial computing and generative artificial intelligence converge, the necessity for robust, secure, and highly optimized integration architectures becomes strictly paramount. The <b>Vectra Spatial Computing Protocol</b> bridges the gap between high-fidelity digital twins and localized generative AI pipelines without relying on external cloud computing.</p>
+
+<p>By enforcing a strictly decoupled, asynchronous client-server architecture, computationally expensive deep learning models (U<sup>2</sup>-Net, SDXL-Lightning, and TripoSR) are successfully orchestrated on constrained consumer-grade edge hardware (strictly within an <b>8GB VRAM</b> threshold). Furthermore, the introduction of the <b>Deep Splat Excavation (DBSE)</b> algorithm resolves critical spatial occlusion problems inherent to dense Gaussian Splatting environments. This methodology lays the foundational groundwork for embedding definitive mathematical safeguards into the next generation of spatial rendering pipelines.</p>
+
+<br>
+
+## Video Demonstration
+
+<p>To fully observe the interactive nature of the Vectra Spatial Computing Protocol, including the non-blocking rendering loop and the real-time VRAM orchestration, please review the supplementary video demonstration below.</p>
 
 <p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
+  <a href="https://youtube.com/watch?v=YOUR_VIDEO_ID_HERE">
+    <img src="https://img.youtube.com/vi/YOUR_VIDEO_ID_HERE/maxresdefault.jpg" alt="Vectra Protocol Demonstration" width="700">
+  </a>
+  <br>
+  <i>Click the image above to watch the system demonstration on YouTube.</i>
 </p>
 
-## About Laravel
+<br>
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Introduction
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+<p>Integrating AI-generated 3D assets into scanned physical environments traditionally suffers from severe hardware bottlenecks and geometric visual artifacts (such as Z-fighting and object clipping). Vectra solves this through two primary computational innovations:</p>
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+<ul>
+  <li><b>The Edge-Computed Generative Pipeline:</b> A robust local GPU Forge that aggressively manages memory cycles to prevent Out-Of-Memory (OOM) kernel panics when generating meshes via localized Text-to-3D and Image-to-3D prompts.</li>
+  <li><b>Non-Destructive Spatial Masking:</b> Instead of permanently altering source point cloud data, the system mathematically calculates volumetric raycast bounds to dynamically override shader alpha values, allowing new assets to spawn seamlessly within the original spatial coordinates.</li>
+</ul>
 
-## Learning Laravel
+<br>
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## System Architecture
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+<table>
+  <tr>
+    <td width="50%">
+      <h3>Client-Side (The Viewport)</h3>
+      <p>Operates entirely within a standard web browser. Strictly responsible for real-time interaction, asynchronous data transmission, and physics calculations.</p>
+      <ul>
+        <li><b>Rendering:</b> <code>Three.js</code> + <code>gsplat.js</code></li>
+        <li><b>Physics Middleware:</b> <code>Cannon.js</code></li>
+        <li><b>UI Architecture:</b> Asynchronous Glassmorphism</li>
+      </ul>
+    </td>
+    <td width="50%">
+      <h3>Server-Side (The GPU Forge)</h3>
+      <p>An autonomous Python backend hosting the neural networks, systematically managing VRAM flushing protocols.</p>
+      <ul>
+        <li><b>Computational Core:</b> <code>FastAPI</code></li>
+        <li><b>Semantic Masking:</b> <code>U2-Net</code></li>
+        <li><b>Volumetric Forging:</b> <code>TripoSR</code></li>
+        <li><b>Latent Generation:</b> <code>SDXL-Lightning</code> (FP16)</li>
+      </ul>
+    </td>
+  </tr>
+</table>
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+<br>
 
-## Agentic Development
+## Hardware Requirements
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+<blockquote>
+  <p><b>Strict Memory Constraint Warning:</b> This protocol is explicitly engineered to run on standard edge-computing hardware. Attempting to bypass the sequential loading limits without sufficient hardware architecture will result in immediate CUDA OOM errors.</p>
+</blockquote>
 
-```bash
-composer require laravel/boost --dev
+<ul>
+  <li><b>GPU:</b> NVIDIA RTX 4060 (or equivalent architecture)</li>
+  <li><b>VRAM:</b> 8GB Minimum (System usage peaks at roughly 7.8GB during TripoSR inference)</li>
+  <li><b>OS:</b> Ubuntu / Debian-based Linux environment is highly recommended for deep learning and tensor dependencies.</li>
+</ul>
 
-php artisan boost:install
-```
+<br>
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+## Core Features & Protocols
 
-## Contributing
+<details>
+  <summary><kbd>► Click to expand: Deep Splat Excavation (DBSE)</kbd></summary>
+  <p>
+    <br>
+    The DBSE protocol solves spatial occlusion by capturing a 2D bounding box from the viewport, mapping it to absolute WebGL coordinates, and transmitting the pure pixel data payload. The rendering engine evaluates the spatial coordinates of every Gaussian splat against the defined 3D volume, dynamically overriding opacity values to zero in the fragment shader to mathematically excavate a clean void for the newly generated asset.
+  </p>
+</details>
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+<details>
+  <summary><kbd>► Click to expand: Sequential VRAM Orchestration</kbd></summary>
+  <p>
+    <br>
+    To guarantee the 8GB VRAM limit is never breached, neural networks are strictly prevented from loading simultaneously. The system loads SDXL-Lightning in half-precision (FP16), generates the 2D tensor, entirely purges the cache via <code>torch.cuda.empty_cache()</code>, invokes the garbage collector, and only reallocates memory for TripoSR once the GPU ceiling returns to baseline.
+  </p>
+</details>
 
-## Code of Conduct
+<br>
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## Citation & Research
 
-## Security Vulnerabilities
+<p>If you utilize this protocol, the VRAM orchestration logic, or the Deep Splat Excavation (DBSE) algorithm in your own academic research, please cite the associated Master's Thesis:</p>
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+<pre><code>@mastersthesis{vectra2026,
+  author  = {Your Name},
+  title   = {Applied AI Security Frameworks and Mathematical Safeguards in Generative Spatial Computing},
+  school  = {TU Bergakademie Freiberg},
+  year    = {2026}
+}
+</code></pre>
 
-## License
+<br>
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+<div align="center">
+  <p><i>Engineered for secure, edge-computed spatial artificial intelligence.</i></p>
+</div>
