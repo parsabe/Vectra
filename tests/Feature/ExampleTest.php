@@ -16,4 +16,15 @@ class ExampleTest extends TestCase
 
         $response->assertStatus(200);
     }
+
+    /**
+     * Test that the presentation page is accessible.
+     */
+    public function test_the_presentation_page_returns_a_successful_response(): void
+    {
+        $response = $this->get('/presentation');
+
+        $response->assertStatus(200);
+        $response->assertSee('Vectra: The Quarantine Matrix');
+    }
 }

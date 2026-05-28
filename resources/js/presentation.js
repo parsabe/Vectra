@@ -11,7 +11,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 // Register GSAP plugins
 gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
 
-console.log('%c[VECTRA PRESENTATION] Initializing 15-Stage Bloom Scrollytelling Engine...', 'color: #ffffff; font-weight: bold;');
+console.log('%c[VECTRA PRESENTATION] Initializing 16-Stage Bloom Scrollytelling Engine...', 'color: #ffffff; font-weight: bold;');
 
 // DOM Elements
 const canvas = document.getElementById('bg-canvas');
@@ -230,8 +230,8 @@ planetGroup.rotation.x = 0.4;
 planetGroup.rotation.z = 0.15;
 scene.add(planetGroup);
 
-// ── GSAP ScrollTrigger 15-Section Timeline ────────────────────────────────────
-// Stage Coordinates Mapping for 15 Snap Sections (0 to 14)
+// ── GSAP ScrollTrigger 16-Stage Timeline ────────────────────────────────────
+// Stage Coordinates Mapping for 16 Snap Sections (0 to 15)
 const steps = [
     { pos: {x: 0, y: 0, z: 11.5}, target: {x: 0, y: 0, z: 0} }, // Sec 0: Hero
     { pos: {x: -2.2, y: 0.4, z: 9.0}, target: {x: 0.8, y: -0.2, z: 0} }, // Sec 1: Related Work Math
@@ -247,14 +247,15 @@ const steps = [
     { pos: {x: 0.0, y: 0.0, z: 6.5}, target: {x: 0, y: 0, z: 0} }, // Sec 11: Methodology Flowchart
     { pos: {x: 0.0, y: 0.1, z: 4.2}, target: {x: 0, y: 0, z: 0} }, // Sec 12: Figure 11
     { pos: {x: 0.0, y: 3.2, z: 3.5}, target: {x: 0, y: 0, z: -0.2} }, // Sec 13: Figure 12
-    { pos: {x: 0.0, y: 0.0, z: 12.0}, target: {x: 0, y: 0, z: 0} }  // Sec 14: Conclusion & Launch
+    { pos: {x: 0.0, y: 0.0, z: 10.0}, target: {x: 0, y: 0, z: 0} }, // Sec 14: Conclusion
+    { pos: {x: 0.0, y: 0.0, z: 12.0}, target: {x: 0, y: 0, z: 0} }  // Sec 15: References & Launch Portal
 ];
 
 // Set initial camera variables
 camera.position.set(steps[0].pos.x, steps[0].pos.y, steps[0].pos.z);
 cameraTarget.set(steps[0].target.x, steps[0].target.y, steps[0].target.z);
 
-// Define master ScrollTrigger timeline for 15 sections
+// Define master ScrollTrigger timeline for 16 sections
 const mainTimeline = gsap.timeline({
     scrollTrigger: {
         trigger: '#scroll-container',
@@ -263,7 +264,7 @@ const mainTimeline = gsap.timeline({
         scrub: 1.5,
         pin: '#scroll-wrapper',
         snap: {
-            snapTo: 1 / 14, // Snapping intervals across 15 sections
+            snapTo: 1 / 15, // Snapping intervals across 16 sections
             duration: { min: 0.3, max: 0.8 },
             delay: 0.1,
             ease: 'power1.inOut'
@@ -272,7 +273,7 @@ const mainTimeline = gsap.timeline({
 });
 
 // Set initial states for absolute sections
-const totalSections = 15;
+const totalSections = 16;
 for (let i = 0; i < totalSections; i++) {
     const el = document.getElementById(`section-${i}`);
     if (el) {
@@ -285,7 +286,7 @@ for (let i = 0; i < totalSections; i++) {
 }
 
 // Build scroll-bound 3D orbits and content entries
-for (let i = 0; i < 14; i++) {
+for (let i = 0; i < 15; i++) {
     const next = steps[i + 1];
     
     // 1. Camera flight path
@@ -370,7 +371,7 @@ window.addEventListener('scroll', () => {
         }
 
         // Highlight active nav dot
-        const currentSlide = Math.round((window.scrollY / scrollHeight) * 14);
+        const currentSlide = Math.round((window.scrollY / scrollHeight) * 15);
         for (let i = 0; i < totalSections; i++) {
             const dot = document.getElementById(`dot-${i}`);
             if (dot) {
