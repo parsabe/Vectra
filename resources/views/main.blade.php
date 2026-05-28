@@ -55,7 +55,7 @@
             <!-- Portal Title -->
             <div class="text-center mb-8">
                 <h1 class="font-mono text-glow-cyan tracking-wider font-black text-2xl md:text-3xl uppercase mb-1">
-                    VECTRA
+                    VECTRA // SYSTEM_HUB
                 </h1>
                 <p class="text-neutral-500 text-[10px] uppercase tracking-[0.2em]">
                     The Quarantine Matrix, Constraining Neural Hallucinations in 3D Gaussian Environments
