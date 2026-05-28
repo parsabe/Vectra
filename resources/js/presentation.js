@@ -5,8 +5,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 // Register GSAP ScrollTrigger plugin
 gsap.registerPlugin(ScrollTrigger);
 
-// Initialize system version log
-console.log('%c[VECTRA PRESENTATION] Booting 3D Scroll Presentation Engine...', 'color: #00f3ff; font-weight: bold;');
+console.log('%c[VECTRA PRESENTATION] Initializing Smooth Kinetic Scrollytelling Engine...', 'color: #39ff14; font-weight: bold;');
 
 // DOM Elements
 const canvas = document.getElementById('webgl-canvas');
@@ -14,18 +13,41 @@ if (!canvas) {
     console.error('[SYSTEM_ERR] WebGL Canvas not found in DOM.');
 }
 
+// ── Lenis Smooth Scrolling Setup ─────────────────────────────────────────────
+// Setup Lenis smooth scroll for a premium, buttery feel (like peachweb.io)
+const lenis = new Lenis({
+    duration: 1.4,
+    easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), // smooth exponential out
+    direction: 'vertical',
+    gestureDirection: 'vertical',
+    smooth: true,
+    mouseMultiplier: 0.95,
+    smoothTouch: false,
+    touchMultiplier: 1.5,
+    infinite: false,
+});
+
+// Update ScrollTrigger on Lenis scroll tick
+lenis.on('scroll', ScrollTrigger.update);
+
+// Sync GSAP ticker with Lenis requestAnimationFrame loop
+gsap.ticker.add((time) => {
+    lenis.raf(time * 1000);
+});
+gsap.ticker.lagSmoothing(0);
+
 // ── Three.js Scene Configuration ─────────────────────────────────────────────
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x020204);
-scene.fog = new THREE.FogExp2(0x020204, 0.018); // Cyberpunk volumetric depth fog
+scene.fog = new THREE.FogExp2(0x020204, 0.015); // Volumetric depths fog
 
 // Camera setup
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 500);
 
-// Camera Target (for smooth lookAt sweep animations)
+// Camera Target coordinate vector (used in lookAt loop)
 const cameraTarget = new THREE.Vector3(0, 1.5, 0);
 
-// Renderer setup
+// WebGL Renderer Setup
 const renderer = new THREE.WebGLRenderer({
     canvas: canvas,
     antialias: true,
@@ -36,15 +58,15 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
 // ── Lights Setup ─────────────────────────────────────────────────────────────
-const ambientLight = new THREE.AmbientLight(0x0d0f14, 1.5);
+const ambientLight = new THREE.AmbientLight(0x0a0d14, 1.8);
 scene.add(ambientLight);
 
-// Floating neon scanning point lights
-const cyanLight = new THREE.PointLight(0x00f3ff, 6, 60);
+// Neon colored floating point lights
+const cyanLight = new THREE.PointLight(0x00f3ff, 5, 55);
 cyanLight.position.set(-6, 3, 20);
 scene.add(cyanLight);
 
-const magentaLight = new THREE.PointLight(0xff00ff, 6, 60);
+const magentaLight = new THREE.PointLight(0xff00ff, 5, 55);
 magentaLight.position.set(6, 3, -30);
 scene.add(magentaLight);
 
@@ -52,45 +74,44 @@ const yellowLight = new THREE.PointLight(0xeab308, 4, 45);
 yellowLight.position.set(0, 5, -80);
 scene.add(yellowLight);
 
-// ── Procedural Geometry Generation ───────────────────────────────────────────
-// Technical floor grid helper
+// ── Procedural Environment (Quarantine Matrix) ───────────────────────────────
+// Technical ground grid
 const gridHelper = new THREE.GridHelper(300, 120, 0xff00ff, 0x00f3ff);
 gridHelper.position.y = -2.5;
 scene.add(gridHelper);
 
-// Cyberpunk Wireframe Tunnel/Corridor
+// Twistable wireframe corridor tunnel
 const tunnelGroup = new THREE.Group();
-const numGates = 30;
-const gateSpacing = 7; // distance between gates
+const numGates = 35;
+const gateSpacing = 6.5;
 
 for (let i = 0; i < numGates; i++) {
-    const zPos = 35 - i * gateSpacing; // Z positions stretching from 35 to -175
+    const zPos = 35 - i * gateSpacing; // Z from 35 down to -192
     const sizeWidth = 14 + Math.sin(i * 0.4) * 2;
-    const sizeHeight = 8 + Math.cos(i * 0.4) * 1.5;
+    const sizeHeight = 7.5 + Math.cos(i * 0.4) * 1.5;
 
     const geom = new THREE.BoxGeometry(sizeWidth, sizeHeight, 2);
     const edges = new THREE.EdgesGeometry(geom);
-    
-    // Alternating cyan, magenta, and electric yellow colors
+
     let themeColor;
-    if (i % 3 === 0) themeColor = 0x00f3ff; // Cyan
-    else if (i % 3 === 1) themeColor = 0xff00ff; // Magenta
-    else themeColor = 0xeab308; // Yellow
+    if (i % 3 === 0) themeColor = 0x00f3ff;
+    else if (i % 3 === 1) themeColor = 0xff00ff;
+    else themeColor = 0xeab308;
 
     const mat = new THREE.LineBasicMaterial({
         color: themeColor,
         transparent: true,
-        opacity: Math.max(0.4 - (i / numGates) * 0.25, 0.1) // Fade out gates in distance
+        opacity: Math.max(0.42 - (i / numGates) * 0.28, 0.08)
     });
-    
+
     const gate = new THREE.LineSegments(edges, mat);
-    gate.position.set(0, 1.5, zPos);
+    gate.position.set(0, 1.25, zPos);
     tunnelGroup.add(gate);
 }
 scene.add(tunnelGroup);
 
-// Volumetric Neural Particle Nodes (simulating Gaussian nodes matrix)
-const particleCount = 3500;
+// Volumetric Neural Particle Nodes (represent Gaussian splat coordinates)
+const particleCount = 3800;
 const particleGeometry = new THREE.BufferGeometry();
 const positions = new Float32Array(particleCount * 3);
 const colors = new Float32Array(particleCount * 3);
@@ -100,18 +121,16 @@ const colorMagenta = new THREE.Color(0xff00ff);
 const colorYellow = new THREE.Color(0xeab308);
 
 for (let i = 0; i < particleCount; i++) {
-    // Tunnel cylinder coordinate mapping
     const theta = Math.random() * Math.PI * 2;
-    const radius = 5.5 + Math.random() * 18; // Keep particles outside immediate corridor center
+    const radius = 5.0 + Math.random() * 16; // Distribution envelope
     const x = Math.cos(theta) * radius;
-    const y = Math.sin(theta) * radius + 1.5;
-    const z = Math.random() * 260 - 200; // Z from -200 to +60
+    const y = Math.sin(theta) * radius + 1.25;
+    const z = Math.random() * 250 - 190; // Z coordinates range
 
     positions[i * 3] = x;
     positions[i * 3 + 1] = y;
     positions[i * 3 + 2] = z;
 
-    // Randomize accent colors
     const rand = Math.random();
     let pColor;
     if (rand < 0.45) {
@@ -130,7 +149,7 @@ for (let i = 0; i < particleCount; i++) {
 particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 particleGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
-// Create a glowing particle dot texture using offscreen canvas
+// Glowing circular particle texture via Canvas
 const pCanvas = document.createElement('canvas');
 pCanvas.width = 16;
 pCanvas.height = 16;
@@ -144,11 +163,11 @@ pCtx.fillRect(0, 0, 16, 16);
 const pTexture = new THREE.CanvasTexture(pCanvas);
 
 const particleMaterial = new THREE.PointsMaterial({
-    size: 0.28,
+    size: 0.3,
     map: pTexture,
     vertexColors: true,
     transparent: true,
-    opacity: 0.85,
+    opacity: 0.88,
     blending: THREE.AdditiveBlending,
     depthWrite: false
 });
@@ -156,44 +175,68 @@ const particleMaterial = new THREE.PointsMaterial({
 const particleSystem = new THREE.Points(particleGeometry, particleMaterial);
 scene.add(particleSystem);
 
-// ── GSAP ScrollTrigger Camera Path Orchestration ────────────────────────────
-// Initial camera coordinates
+// ── GSAP ScrollTrigger Collaborative Animations ──────────────────────────────
+// Define initial positions
 camera.position.set(0, 3, 40);
-cameraTarget.set(0, 1.5, 5);
+cameraTarget.set(0, 1.25, 5);
 
-// Create a master timeline that scrubs through the scroll progress
+// Create timeline scrub bound directly to viewport scroll
 const scrollTimeline = gsap.timeline({
     scrollTrigger: {
         trigger: 'body',
         start: 'top top',
         end: 'bottom bottom',
-        scrub: 1.2, // Smooth follow scrub
+        scrub: 1.8, // Slightly higher scrub lag for smoother float transitions
     }
 });
 
-// Section-by-section flight coordinates mapping:
-// Section 1 (Hero): Camera (0, 3, 40) looking at (0, 1.5, 5)
-// Section 2 (Radiance): Camera flies to right (5, 1.8, 15) looking at (-2, 0.5, -15)
-// Section 3 (Semantic): Camera sweeps left (-6, 3, -15) looking at (3, 1, -40)
-// Section 4 (Gaussian): Camera sinks down (0, 0.2, -60) looking at (0, 0.8, -95) (inside dense particle zone)
-// Section 5 (Methodology): Camera rises at the end (0, 2.5, -105) looking at (0, 1.5, -160)
-
+// Animate camera position and target through the matrix (Z-axis flight path)
 scrollTimeline
-    // Phase 1: Scroll towards Section 2
-    .to(camera.position, { x: 5, y: 1.8, z: 15, ease: 'power1.inOut' }, 0)
-    .to(cameraTarget, { x: -2, y: 0.5, z: -15, ease: 'power1.inOut' }, 0)
+    // Phase 1 (Hero to Radiance)
+    .to(camera.position, { x: 4.5, y: 1.8, z: 15, ease: 'power1.inOut' }, 0)
+    .to(cameraTarget, { x: -2.5, y: 0.6, z: -15, ease: 'power1.inOut' }, 0)
     
-    // Phase 2: Scroll towards Section 3
-    .to(camera.position, { x: -6, y: 3, z: -20, ease: 'power1.inOut' }, 1)
-    .to(cameraTarget, { x: 3, y: 1, z: -55, ease: 'power1.inOut' }, 1)
+    // Phase 2 (Radiance to Semantic)
+    .to(camera.position, { x: -5.5, y: 2.8, z: -20, ease: 'power1.inOut' }, 1)
+    .to(cameraTarget, { x: 3, y: 0.9, z: -55, ease: 'power1.inOut' }, 1)
     
-    // Phase 3: Scroll towards Section 4
-    .to(camera.position, { x: 0, y: 0.2, z: -70, ease: 'power1.inOut' }, 2)
-    .to(cameraTarget, { x: 0, y: 0.8, z: -105, ease: 'power1.inOut' }, 2)
+    // Phase 3 (Semantic to Gaussian)
+    .to(camera.position, { x: 0, y: 0.15, z: -70, ease: 'power1.inOut' }, 2)
+    .to(cameraTarget, { x: 0, y: 0.75, z: -105, ease: 'power1.inOut' }, 2)
     
-    // Phase 4: Scroll towards Section 5
-    .to(camera.position, { x: 0, y: 3, z: -115, ease: 'power1.inOut' }, 3)
-    .to(cameraTarget, { x: 0, y: 1.5, z: -170, ease: 'power1.inOut' }, 3);
+    // Phase 4 (Gaussian to Methodology)
+    .to(camera.position, { x: 0, y: 2.8, z: -115, ease: 'power1.inOut' }, 3)
+    .to(cameraTarget, { x: 0, y: 1.25, z: -170, ease: 'power1.inOut' }, 3);
+
+// BACKGROUND SCROLL COLLABORATION: Make environment react dynamically to scroll!
+scrollTimeline
+    // 1. Twist the wireframe tunnel gates based on scroll progress
+    .to(tunnelGroup.rotation, { z: Math.PI * 1.5, ease: 'none' }, 0)
+    
+    // 2. Morph the particle swarm scale (breathing warp effect)
+    .to(particleSystem.scale, { x: 1.25, y: 1.25, z: 0.8, ease: 'power1.inOut' }, 0)
+    .to(particleSystem.scale, { x: 0.75, y: 0.75, z: 1.25, ease: 'power1.inOut' }, 1.5)
+    .to(particleSystem.scale, { x: 1.0, y: 1.0, z: 1.0, ease: 'power1.inOut' }, 3)
+    
+    // 3. Move point lights alongside Z-axis path to stay with the camera
+    .to(cyanLight.position, { z: -100, ease: 'none' }, 0)
+    .to(magentaLight.position, { z: -110, ease: 'none' }, 0)
+    .to(yellowLight.position, { z: -130, ease: 'none' }, 0)
+    
+    // 4. Animate light intensity peaks to light up active sections
+    .to(cyanLight, { intensity: 10, ease: 'power1.inOut' }, 0.5)
+    .to(cyanLight, { intensity: 4, ease: 'power1.inOut' }, 2.0)
+    .to(magentaLight, { intensity: 10, ease: 'power1.inOut' }, 1.5)
+    .to(magentaLight, { intensity: 4, ease: 'power1.inOut' }, 3.0)
+
+    // 5. Morph Fog parameters & Color signatures dynamically
+    .to(scene.fog.color, { r: 0.005, g: 0.065, b: 0.095, ease: 'power1.inOut' }, 0.5) // Cyan zone
+    .to(scene.fog.color, { r: 0.08, g: 0.005, b: 0.095, ease: 'power1.inOut' }, 1.5)  // Magenta zone
+    .to(scene.fog.color, { r: 0.095, g: 0.085, b: 0.005, ease: 'power1.inOut' }, 2.5) // Yellow zone
+    .to(scene.fog.color, { r: 0.008, g: 0.008, b: 0.016, ease: 'power1.inOut' }, 3.5) // Reset dark
+    
+    .to(scene.fog, { density: 0.024, ease: 'power1.inOut' }, 0.5)
+    .to(scene.fog, { density: 0.012, ease: 'power1.inOut' }, 2.0);
 
 // ── Content Panels Fade In/Out on Scroll ──────────────────────────────────────
 const sections = document.querySelectorAll('section');
@@ -251,22 +294,18 @@ function animate() {
 
     const time = clock.getElapsedTime();
 
-    // 1. Slow background drift animations
-    particleSystem.rotation.z = time * 0.008;
-    particleSystem.rotation.x = Math.sin(time * 0.03) * 0.02;
+    // 1. Constant minor background drift (prevents visual staticness when scroll stops)
+    particleSystem.rotation.z = time * 0.006;
+    particleSystem.rotation.x = Math.sin(time * 0.02) * 0.015;
 
-    // 2. Animate point lights floating to scan the corridor
-    cyanLight.position.x = -6 + Math.sin(time * 1.5) * 2;
-    cyanLight.position.y = 3 + Math.cos(time * 1.2) * 1.2;
-    cyanLight.position.z = 20 + Math.sin(time * 0.8) * 15;
+    // 2. Continuous floating light orbits
+    cyanLight.position.x += Math.sin(time * 1.2) * 0.05;
+    cyanLight.position.y += Math.cos(time * 0.9) * 0.03;
+    
+    magentaLight.position.x += Math.cos(time * 1.2) * 0.05;
+    magentaLight.position.y += Math.sin(time * 0.9) * 0.03;
 
-    magentaLight.position.x = 6 + Math.cos(time * 1.5) * 2;
-    magentaLight.position.y = 3 + Math.sin(time * 1.2) * 1.2;
-    magentaLight.position.z = -30 - Math.cos(time * 0.8) * 15;
-
-    yellowLight.position.y = 5 + Math.sin(time * 2.0) * 1.5;
-
-    // 3. Make camera look at target coordinate
+    // 3. Force camera lookAt coordinate focus
     camera.lookAt(cameraTarget);
 
     // 4. Render
