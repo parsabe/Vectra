@@ -1,10 +1,16 @@
 <div align="center">
   
   <br>
-  <font size="6"><b>VECTRA // SPATIAL_CORE</b></font>
-  <br><br>
-  <p><b>Applied AI Security Frameworks & Generative 3D Spatial Computing</b></p>
 
+  <br><br>
+  # VECTRA
+  <br>
+ 
+
+  <p><b>The Quarantine Matrix, Constraining Neural Hallucinations in 3D Gaussian Environments</b></p>
+  
+ <img src="https://github.com/parsabe/Vectra/blob/master/logo.png?raw=true">
+ <br>
   <p>
     <a href="#abstract">Abstract</a> •
     <a href="#video-demonstration">Video Demo</a> •
@@ -35,13 +41,14 @@
 
 <p>To fully observe the interactive nature of the Vectra Spatial Computing Protocol, including the non-blocking rendering loop and the real-time VRAM orchestration, please review the supplementary video demonstration below.</p>
 
-<p align="center">
-  <a href="https://youtube.com/watch?v=YOUR_VIDEO_ID_HERE">
-    <img src="https://img.youtube.com/vi/YOUR_VIDEO_ID_HERE/maxresdefault.jpg" alt="Vectra Protocol Demonstration" width="700">
-  </a>
+<div align="center">
+  <video width="700" controls>
+    <source src="YOUR_VIDEO_URL_HERE.mp4" type="video/mp4">
+    Your browser does not support the HTML5 video tag.
+  </video>
   <br>
-  <i>Click the image above to watch the system demonstration on YouTube.</i>
-</p>
+  <i>System demonstration and real-time execution.</i>
+</div>
 
 <br>
 
@@ -123,8 +130,8 @@
 <p>If you utilize this protocol, the VRAM orchestration logic, or the Deep Splat Excavation (DBSE) algorithm in your own academic research, please cite the associated Master's Thesis:</p>
 
 <pre><code>@mastersthesis{vectra2026,
-  author  = {Your Name},
-  title   = {Applied AI Security Frameworks and Mathematical Safeguards in Generative Spatial Computing},
+  author  = {Parsa Besharat},
+  title   = {Vectra: The Quarantine Matrix, Constraining Neural Hallucinations in 3D Gaussian Environment},
   school  = {TU Bergakademie Freiberg},
   year    = {2026}
 }
