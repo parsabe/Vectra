@@ -278,23 +278,23 @@
 
                 <!-- SECTION 5: FIGURE 3 (DIETNERF IMAGE - COMPARISONS) -->
                 <section id="section-5" class="scrolly-section">
-                    <div class="w-full max-w-[95vw] mx-auto px-6 md:px-12 flex flex-col justify-center items-center floating-pane">
-                        <div class="font-mono text-[10px] text-fuchsia-400 tracking-[0.3em] uppercase mb-4 text-glow-magenta">// VISUAL ARCHIVE // FIGURE 3</div>
-                        <div class="relative overflow-visible bg-transparent rounded-xl border border-white/5 p-2 flex justify-center items-center w-full max-w-[90vw] max-h-[82vh]">
-                            <img src="/img/3.png" alt="Figure 3" class="w-full max-w-[1300px] h-auto max-h-[80vh] object-contain rounded-lg shadow-2xl">
+                    <div class="w-full h-full flex flex-col justify-center items-center floating-pane p-4">
+                        <div class="font-mono text-[10px] text-fuchsia-400 tracking-[0.3em] uppercase mb-2 text-glow-magenta">// VISUAL ARCHIVE // FIGURE 3</div>
+                        <div class="w-full max-w-[98vw] h-[82vh] flex justify-center items-center">
+                            <img src="/img/3.png" alt="Figure 3" class="w-full h-full object-contain rounded-lg shadow-2xl" style="image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges;">
                         </div>
-                        <div class="font-mono text-[10px] text-neutral-400 mt-4 text-center tracking-wide uppercase">// Figure 3: DietNeRF Novel Views synthesized from sparse input DTU dataset</div>
+                        <div class="font-mono text-[9px] md:text-[10px] text-neutral-400 mt-2 text-center tracking-wide uppercase">// Figure 3: DietNeRF Novel Views synthesized from sparse input DTU dataset</div>
                     </div>
                 </section>
 
                 <!-- SECTION 6: FIGURE 2 (DIETNERF IMAGE - FEWSHOT) -->
                 <section id="section-6" class="scrolly-section">
-                    <div class="w-full max-w-[95vw] mx-auto px-6 md:px-12 flex flex-col justify-center items-center floating-pane">
-                        <div class="font-mono text-[10px] text-fuchsia-400 tracking-[0.3em] uppercase mb-4 text-glow-magenta">// VISUAL ARCHIVE // FIGURE 2</div>
-                        <div class="relative overflow-visible bg-transparent rounded-xl border border-white/5 p-2 flex justify-center items-center w-full max-w-[90vw] max-h-[82vh]">
-                            <img src="/img/2.png" alt="Figure 2" class="w-full max-w-[1300px] h-auto max-h-[80vh] object-contain rounded-lg shadow-2xl">
+                    <div class="w-full h-full flex flex-col justify-center items-center floating-pane p-4">
+                        <div class="font-mono text-[10px] text-fuchsia-400 tracking-[0.3em] uppercase mb-2 text-glow-magenta">// VISUAL ARCHIVE // FIGURE 2</div>
+                        <div class="w-full max-w-[98vw] h-[82vh] flex justify-center items-center">
+                            <img src="/img/2.png" alt="Figure 2" class="w-full h-full object-contain rounded-lg shadow-2xl" style="image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges;">
                         </div>
-                        <div class="font-mono text-[10px] text-neutral-400 mt-4 text-center tracking-wide uppercase">// Figure 2: View Synthesis comparison on Realistic Synthetic Dataset</div>
+                        <div class="font-mono text-[9px] md:text-[10px] text-neutral-400 mt-2 text-center tracking-wide uppercase">// Figure 2: View Synthesis comparison on Realistic Synthetic Dataset</div>
                     </div>
                 </section>
 
@@ -326,12 +326,12 @@
 
                 <!-- SECTION 8: FIGURE 7 (GENERATIVE 3D IMAGE - COMPARISONS) -->
                 <section id="section-8" class="scrolly-section">
-                    <div class="w-full max-w-[95vw] mx-auto px-6 md:px-12 flex flex-col justify-center items-center floating-pane">
-                        <div class="font-mono text-[10px] text-yellow-400 tracking-[0.3em] uppercase mb-4 text-glow-yellow">// VISUAL ARCHIVE // FIGURE 7</div>
-                        <div class="relative overflow-visible bg-transparent rounded-xl border border-white/5 p-2 flex justify-center items-center w-full max-w-[90vw] max-h-[82vh]">
-                            <img src="/img/7.png" alt="Figure 7" class="w-full max-w-[1300px] h-auto max-h-[80vh] object-contain rounded-lg shadow-2xl">
+                    <div class="w-full h-full flex flex-col justify-center items-center floating-pane p-4">
+                        <div class="font-mono text-[10px] text-yellow-400 tracking-[0.3em] uppercase mb-2 text-glow-yellow">// VISUAL ARCHIVE // FIGURE 7</div>
+                        <div class="w-full max-w-[98vw] h-[82vh] flex justify-center items-center">
+                            <img src="/img/7.png" alt="Figure 7" class="w-full h-full object-contain rounded-lg shadow-2xl" style="image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges;">
                         </div>
-                        <div class="font-mono text-[10px] text-neutral-400 mt-4 text-center tracking-wide uppercase">// Figure 7: Qualitative comparison on Image-to-3D algorithms</div>
+                        <div class="font-mono text-[9px] md:text-[10px] text-neutral-400 mt-2 text-center tracking-wide uppercase">// Figure 7: Qualitative comparison on Image-to-3D algorithms</div>
                     </div>
                 </section>
 
@@ -456,13 +456,13 @@
                             <h2 class="font-mono uppercase text-2xl md:text-3xl font-black text-white mb-4">
                                 References & Launch
                             </h2>
-                            <ul class="font-mono text-sm md:text-base text-white space-y-3.5 max-h-[350px] overflow-y-auto pr-2">
-                                <li class="text-white"><span class="text-yellow-400 font-bold">[1]</span> Mildenhall et al. (2020) - <em class="text-cyan-300">NeRF: Representing Scenes as Neural Radiance Fields for View Synthesis</em> (ECCV).</li>
-                                <li class="text-white"><span class="text-yellow-400 font-bold">[2]</span> Rabby & Zhang (2024) - <em class="text-cyan-300">BeyondPixels: A Comprehensive Review of the Evolution of Neural Radiance Fields</em> (arXiv).</li>
-                                <li class="text-white"><span class="text-yellow-400 font-bold">[3]</span> Jain et al. (2021) - <em class="text-cyan-300">Putting NeRF on a Diet: Semantically Consistent Few-Shot View Synthesis</em> (ICCV).</li>
-                                <li class="text-white"><span class="text-yellow-400 font-bold">[4]</span> Niemeyer et al. (2022) - <em class="text-cyan-300">RegNeRF: Regularizing Neural Radiance Fields for View Synthesis from Sparse Inputs</em> (CVPR).</li>
-                                <li class="text-white"><span class="text-yellow-400 font-bold">[5]</span> Tang et al. (2024) - <em class="text-cyan-300">DreamGaussian: Generative Gaussian Splatting for Efficient 3D Content Creation</em> (ICLR).</li>
-                                <li class="text-white"><span class="text-yellow-400 font-bold">[6]</span> Luiten et al. (2023) - <em class="text-cyan-300">Dynamic 3D Gaussians: Tracking by Persistent Dynamic View Synthesis</em> (arXiv).</li>
+                            <ul class="font-mono text-[12px] md:text-[15px] text-white space-y-4 max-h-[360px] overflow-y-auto pr-2 leading-relaxed">
+                                <li class="text-white font-medium">[1] Mildenhall et al. (2020) - <em class="text-neutral-200">NeRF: Representing Scenes as Neural Radiance Fields for View Synthesis</em> (ECCV).</li>
+                                <li class="text-white font-medium">[2] Rabby & Zhang (2024) - <em class="text-neutral-200">BeyondPixels: A Comprehensive Review of the Evolution of Neural Radiance Fields</em> (arXiv).</li>
+                                <li class="text-white font-medium">[3] Jain et al. (2021) - <em class="text-neutral-200">Putting NeRF on a Diet: Semantically Consistent Few-Shot View Synthesis</em> (ICCV).</li>
+                                <li class="text-white font-medium">[4] Niemeyer et al. (2022) - <em class="text-neutral-200">RegNeRF: Regularizing Neural Radiance Fields for View Synthesis from Sparse Inputs</em> (CVPR).</li>
+                                <li class="text-white font-medium">[5] Tang et al. (2024) - <em class="text-neutral-200">DreamGaussian: Generative Gaussian Splatting for Efficient 3D Content Creation</em> (ICLR).</li>
+                                <li class="text-white font-medium">[6] Luiten et al. (2023) - <em class="text-neutral-200">Dynamic 3D Gaussians: Tracking by Persistent Dynamic View Synthesis</em> (arXiv).</li>
                             </ul>
                         </div>
                         <!-- Right Action Panel with glowing borderless link -->

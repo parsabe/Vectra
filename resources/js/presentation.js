@@ -133,94 +133,122 @@ for (let i = 0; i < starCount; i++) {
 starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
 starGeometry.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
 
+// Function to generate a glowing soft star flare texture
+function createStarTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, 64, 64);
+
+    // 1. Draw central glowing radial flare
+    const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 16);
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    gradient.addColorStop(0.2, 'rgba(255, 255, 255, 0.85)');
+    gradient.addColorStop(0.6, 'rgba(255, 255, 255, 0.15)');
+    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(32, 32, 16, 0, 2 * Math.PI);
+    ctx.fill();
+
+    // 2. Draw cross star flares
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(8, 32); ctx.lineTo(56, 32);
+    ctx.moveTo(32, 8); ctx.lineTo(32, 56);
+    ctx.stroke();
+
+    return new THREE.CanvasTexture(canvas);
+}
+
 const starMaterial = new THREE.PointsMaterial({
-    size: 0.35,
+    size: 1.2, // Sized up to render star shape clearly
     vertexColors: true,
     transparent: true,
-    opacity: 0.85,
-    blending: THREE.AdditiveBlending
+    opacity: 0.95,
+    blending: THREE.AdditiveBlending,
+    map: createStarTexture(),
+    depthWrite: false
 });
 const stardust = new THREE.Points(starGeometry, starMaterial);
 scene.add(stardust);
 
-// ── Glowing Celestial Sun Core ──────────────────────────────────────────────
+// ── Procedural Saturn Planet Core & Ring System ─────────────────────────────
 const planetGroup = new THREE.Group();
 
-// Outer Shell: Emissive grid sphere
+// 1. Saturn Body: Create procedural linear band gradient texture
 const pCanvas = document.createElement('canvas');
 pCanvas.width = 512;
-pCanvas.height = 512;
+pCanvas.height = 256;
 const pCtx = pCanvas.getContext('2d');
-pCtx.fillStyle = '#010204';
-pCtx.fillRect(0, 0, 512, 512);
-pCtx.strokeStyle = 'rgba(0, 243, 255, 0.45)';
-pCtx.lineWidth = 1.5;
-for (let i = 0; i <= 512; i += 32) {
-    pCtx.beginPath(); pCtx.moveTo(i, 0); pCtx.lineTo(i, 512); pCtx.stroke();
-    pCtx.beginPath(); pCtx.moveTo(0, i); pCtx.lineTo(512, i); pCtx.stroke();
+const saturnGradient = pCtx.createLinearGradient(0, 0, 0, 256);
+saturnGradient.addColorStop(0, '#3e3124');   // North pole dark brown
+saturnGradient.addColorStop(0.15, '#7b6855'); // Brown-gray transition band
+saturnGradient.addColorStop(0.3, '#c9b79c');  // Creamy bright ocher band
+saturnGradient.addColorStop(0.45, '#a48e71'); // Mid-latitude tan band
+saturnGradient.addColorStop(0.52, '#6f563d'); // Dark ring-shadow style band
+saturnGradient.addColorStop(0.65, '#c5b497'); // South temperate cream band
+saturnGradient.addColorStop(0.8, '#9c8365');  // Warm brown band
+saturnGradient.addColorStop(1.0, '#32261b');   // South pole dark brown
+pCtx.fillStyle = saturnGradient;
+pCtx.fillRect(0, 0, 512, 256);
+
+// Inject random micro-bands for gaseous atmospheric texture
+for (let y = 0; y < 256; y += 3) {
+    pCtx.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.04})`;
+    pCtx.fillRect(0, y, 512, 1 + Math.random() * 2);
+    pCtx.fillStyle = `rgba(0, 0, 0, ${Math.random() * 0.04})`;
+    pCtx.fillRect(0, y, 512, 1 + Math.random() * 2);
 }
-const gridTexture = new THREE.CanvasTexture(pCanvas);
+const saturnTexture = new THREE.CanvasTexture(pCanvas);
 
 const outerGeom = new THREE.SphereGeometry(2.5, 64, 64);
 const outerMat = new THREE.MeshStandardMaterial({
-    map: gridTexture,
-    roughness: 0.1,
-    metalness: 0.9,
-    emissive: 0x00f3ff,
-    emissiveMap: gridTexture,
-    emissiveIntensity: 6.0,
-    transparent: true,
-    opacity: 0.7
+    map: saturnTexture,
+    roughness: 0.82,
+    metalness: 0.1,
+    emissive: 0x110b06 // subtle dark glow to preserve visibility on shadow side
 });
 const outerPlanet = new THREE.Mesh(outerGeom, outerMat);
 planetGroup.add(outerPlanet);
 
-// Inner Core: Blown-out white/cyan glow center
-const innerGeom = new THREE.SphereGeometry(2.4, 32, 32);
-const innerMat = new THREE.MeshBasicMaterial({
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0.95
-});
-const innerPlanet = new THREE.Mesh(innerGeom, innerMat);
-planetGroup.add(innerPlanet);
-
-// Corona: Cyan additive glow boundary
-const coronaGeom = new THREE.SphereGeometry(2.7, 32, 32);
-const coronaMat = new THREE.MeshBasicMaterial({
-    color: 0x00f3ff,
-    transparent: true,
-    opacity: 0.45,
-    blending: THREE.AdditiveBlending
-});
-const coronaMesh = new THREE.Mesh(coronaGeom, coronaMat);
-planetGroup.add(coronaMesh);
-
-// Saturn concentric rings
+// 2. Saturn concentric rings with divisions (Cassini / Encke style)
 const ringGeom = new THREE.RingGeometry(3.3, 7.8, 64);
 ringGeom.rotateX(Math.PI / 2);
 
 const rCanvas = document.createElement('canvas');
 rCanvas.width = 512;
-rCanvas.height = 8;
+rCanvas.height = 512;
 const rCtx = rCanvas.getContext('2d');
-const ringGradient = rCtx.createLinearGradient(0, 0, 512, 0);
-ringGradient.addColorStop(0, 'rgba(0, 243, 255, 0.7)');
-ringGradient.addColorStop(0.18, 'rgba(0, 243, 255, 0.15)');
-ringGradient.addColorStop(0.35, 'rgba(255, 0, 255, 0.7)');
-ringGradient.addColorStop(0.5, 'rgba(255, 0, 255, 0.18)');
-ringGradient.addColorStop(0.7, 'rgba(234, 179, 8, 0.8)');
-ringGradient.addColorStop(0.85, 'rgba(234, 179, 8, 0.2)');
-ringGradient.addColorStop(1.0, 'rgba(0, 243, 255, 0)');
-rCtx.fillStyle = ringGradient;
-rCtx.fillRect(0, 0, 512, 8);
+rCtx.clearRect(0, 0, 512, 512);
+
+// Draw concentric rings from center coordinate (256, 256)
+const centerX = 256;
+const centerY = 256;
+for (let r = 100; r < 250; r += 1) {
+    const opacity = 0.18 + 0.65 * (0.5 + 0.5 * Math.sin(r * 0.35)) * (r > 115 && r < 235 ? 1 : 0.15);
+    
+    let color = 'rgba(215, 198, 172, '; // creamy ocher dust
+    if (r % 16 < 3) color = 'rgba(120, 105, 90, '; // dark Cassini gap division
+    else if (r % 26 < 4) color = 'rgba(175, 162, 145, '; // gray-silver band
+    else if (r > 205) color = 'rgba(235, 222, 202, '; // bright outer A-ring
+    
+    rCtx.beginPath();
+    rCtx.arc(centerX, centerY, r, 0, 2 * Math.PI);
+    rCtx.strokeStyle = color + opacity + ')';
+    rCtx.lineWidth = 1.5;
+    rCtx.stroke();
+}
 const ringTexture = new THREE.CanvasTexture(rCanvas);
 
 const ringMat = new THREE.MeshBasicMaterial({
     map: ringTexture,
     transparent: true,
     side: THREE.DoubleSide,
-    blending: THREE.AdditiveBlending
+    blending: THREE.NormalBlending, // Blend rings naturally without additive over-exposure
+    opacity: 0.95
 });
 const ringMesh = new THREE.Mesh(ringGeom, ringMat);
 planetGroup.add(ringMesh);
@@ -451,8 +479,14 @@ document.addEventListener('DOMContentLoaded', () => {
 function animate() {
     requestAnimationFrame(animate);
 
-    // Stardust slowly drifting internally (planet core is controlled via GSAP scrub)
-    stardust.rotation.y += 0.0003;
+    // 1. Stardust slowly drifting infinitely
+    stardust.rotation.y += 0.0004;
+
+    // 2. Saturn core spins infinitely (independent of scroll-driven orbits)
+    outerPlanet.rotation.y += 0.0022;
+
+    // 3. Saturn rings rotate infinitely
+    ringMesh.rotation.y += 0.0008;
 
     // Force camera alignment with current target coordinates
     camera.lookAt(cameraTarget);
