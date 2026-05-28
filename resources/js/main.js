@@ -14,8 +14,8 @@ if (!canvas) {
 
 // ── Three.js Scene Config ───────────────────────────────────────────────────
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x020204);
-scene.fog = new THREE.FogExp2(0x020204, 0.018); // cyberpunk dark space depth fog
+scene.background = new THREE.Color(0x050510);
+scene.fog = new THREE.FogExp2(0x050510, 0.012); // atmospheric depth fog
 
 // Camera setup
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 300);
@@ -40,118 +40,146 @@ composer.addPass(renderPass);
 
 const bloomPass = new UnrealBloomPass(
     new THREE.Vector2(window.innerWidth, window.innerHeight),
-    1.6,   // Strength
-    0.45,  // Radius
-    0.32   // Threshold
+    2.2,   // Aggressive glow strength
+    0.5,   // Radius
+    0.1    // Low threshold to catch neon BasicMaterials
 );
 composer.addPass(bloomPass);
 
 // ── Light Rigging ──────────────────────────────────────────────────────────
-const ambientLight = new THREE.AmbientLight(0x0b0d1a, 1.8);
+const ambientLight = new THREE.AmbientLight(0x0a0a1a, 1.2);
 scene.add(ambientLight);
 
-// Neon accents lighting up buildings
-const cyanLight = new THREE.PointLight(0x00f3ff, 6, 80);
-cyanLight.position.set(-20, 15, 10);
+// High point lights representing massive high-altitude advertising glows
+const cyanLight = new THREE.PointLight(0x00f3ff, 4, 100);
+cyanLight.position.set(-30, 20, 20);
 scene.add(cyanLight);
 
-const magentaLight = new THREE.PointLight(0xff00ff, 6, 80);
-magentaLight.position.set(20, 15, 10);
+const magentaLight = new THREE.PointLight(0xff00ff, 4, 100);
+magentaLight.position.set(30, 20, 20);
 scene.add(magentaLight);
 
-// ── Procedural Skyscraper Textures ──────────────────────────────────────────
-function createSkyscraperTexture() {
-    const texCanvas = document.createElement('canvas');
-    texCanvas.width = 256;
-    texCanvas.height = 512;
-    const ctx = texCanvas.getContext('2d');
-    
-    // Dark building panel base
-    ctx.fillStyle = '#06060c';
-    ctx.fillRect(0, 0, 256, 512);
-
-    // Draw glowing neon window lattices
-    const cols = 8;
-    const rows = 20;
-    const winW = 16;
-    const winH = 14;
-    const gapX = 14;
-    const gapY = 10;
-
-    for (let c = 0; c < cols; c++) {
-        for (let r = 0; r < rows; r++) {
-            const x = gapX + c * (winW + gapX);
-            const y = gapY + r * (winH + gapY);
-
-            // High probability of dark window, low of bright neon colors
-            const rand = Math.random();
-            if (rand < 0.15) {
-                ctx.fillStyle = '#00f3ff'; // neon cyan
-            } else if (rand < 0.28) {
-                ctx.fillStyle = '#ff00ff'; // neon fuchsia
-            } else if (rand < 0.35) {
-                ctx.fillStyle = '#eab308'; // electric yellow
-            } else {
-                ctx.fillStyle = '#020204'; // unlit window
-            }
-            ctx.fillRect(x, y, winW, winH);
-        }
-    }
-    return new THREE.CanvasTexture(texCanvas);
-}
-
-const buildingTexture = createSkyscraperTexture();
-buildingTexture.wrapS = THREE.RepeatWrapping;
-buildingTexture.wrapT = THREE.RepeatWrapping;
-
-// Skyscraper material applying procedural emission mapping
-const buildingMat = new THREE.MeshStandardMaterial({
-    color: 0x0a0a0f,
-    roughness: 0.95,
-    metalness: 0.05,
-    emissiveMap: buildingTexture,
-    emissive: 0xffffff,
-    emissiveIntensity: 2.2
+// ── The Ground (Wet Asphalt) ────────────────────────────────────────────────
+const groundGeo = new THREE.PlaneGeometry(1000, 1000);
+const groundMat = new THREE.MeshStandardMaterial({
+    color: 0x050510,
+    roughness: 0.1,    // high reflectivity
+    metalness: 0.9     // metallic reflection
 });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = 0;
+scene.add(ground);
 
 // ── Skyscrapers Instanced Mesh ──────────────────────────────────────────────
-const buildingCount = 220;
+const buildingMat = new THREE.MeshStandardMaterial({
+    color: 0x111111,   // Silhouettes in the fog
+    roughness: 0.9,
+    metalness: 0.1
+});
+
+const buildingCount = 240;
 const buildingGeom = new THREE.BoxGeometry(1, 1, 1);
 const buildingMesh = new THREE.InstancedMesh(buildingGeom, buildingMat, buildingCount);
 
 const dummy = new THREE.Object3D();
-const buildingData = [];
+
+// Billboard materials for glow effects
+const billboardMats = {
+    cyan: new THREE.MeshBasicMaterial({ color: 0x00f3ff, side: THREE.DoubleSide }),
+    magenta: new THREE.MeshBasicMaterial({ color: 0xff00ff, side: THREE.DoubleSide }),
+    yellow: new THREE.MeshBasicMaterial({ color: 0xeab308, side: THREE.DoubleSide }),
+    white: new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide })
+};
+const billboardColors = ['cyan', 'magenta', 'yellow', 'white'];
+
+let lightCount = 0;
 
 for (let i = 0; i < buildingCount; i++) {
     // Random height, width, and depth
-    const w = 3.5 + Math.random() * 4.5;
-    const d = 3.5 + Math.random() * 4.5;
-    const h = 12.0 + Math.random() * 32.0;
+    const w = 4.0 + Math.random() * 5.0;
+    const d = 4.0 + Math.random() * 5.0;
+    const h = 15.0 + Math.random() * 35.0;
 
     // Distribute buildings in a ring grid to leave a central flight corridor open
     const angle = Math.random() * Math.PI * 2;
-    const distance = 25.0 + Math.random() * 75.0; // keep corridor open near Z axis
+    const distance = 28.0 + Math.random() * 85.0;
     const px = Math.cos(angle) * distance;
-    // Keep corridor around Z-axis relatively clear of tall skyscrapers
     const pz = Math.sin(angle) * distance;
+    const py = h / 2 - 3;
 
-    dummy.position.set(px, h / 2 - 3, pz); // sink slightly below floor
+    const rotY = (Math.random() - 0.5) * 0.15;
+
+    dummy.position.set(px, py, pz);
     dummy.scale.set(w, h, d);
-    dummy.rotation.y = (Math.random() - 0.5) * 0.15;
+    dummy.rotation.set(0, rotY, 0);
     dummy.updateMatrix();
 
     buildingMesh.setMatrixAt(i, dummy.matrix);
+
+    // Randomly attach flat PlaneGeometry meshes to the sides of taller buildings
+    if (h > 18.0 && Math.random() < 0.5) {
+        const faceIndex = Math.floor(Math.random() * 4);
+        const colName = billboardColors[Math.floor(Math.random() * billboardColors.length)];
+        const bMat = billboardMats[colName];
+
+        const bw = w * (0.4 + Math.random() * 0.4);
+        const bh = h * (0.2 + Math.random() * 0.3);
+        const billboardGeo = new THREE.PlaneGeometry(bw, bh);
+        const billboard = new THREE.Mesh(billboardGeo, bMat);
+
+        let localX = 0;
+        let localZ = 0;
+        let faceRot = 0;
+        const offset = 0.05;
+
+        if (faceIndex === 0) {
+            localZ = d / 2 + offset;
+            faceRot = 0;
+        } else if (faceIndex === 1) {
+            localZ = -d / 2 - offset;
+            faceRot = Math.PI;
+        } else if (faceIndex === 2) {
+            localX = -w / 2 - offset;
+            faceRot = -Math.PI / 2;
+        } else {
+            localX = w / 2 + offset;
+            faceRot = Math.PI / 2;
+        }
+
+        const localY = (Math.random() - 0.5) * (h * 0.4);
+
+        const cosR = Math.cos(rotY);
+        const sinR = Math.sin(rotY);
+        const wx = px + (localX * cosR + localZ * sinR);
+        const wy = py + localY;
+        const wz = pz + (-localX * sinR + localZ * cosR);
+
+        billboard.position.set(wx, wy, wz);
+        billboard.rotation.set(0, rotY + faceRot, 0);
+        scene.add(billboard);
+
+        // Add matching PointLight for reflection on wet ground (max 16 lights)
+        if (lightCount < 16 && wy < 22 && Math.random() < 0.4) {
+            const hexColor = bMat.color.getHex();
+            const pLight = new THREE.PointLight(hexColor, 5, 45, 1.5);
+            pLight.position.set(wx, wy, wz);
+            scene.add(pLight);
+            lightCount++;
+        }
+    }
 }
 
 buildingMesh.instanceMatrix.needsUpdate = true;
 scene.add(buildingMesh);
 
 // ── Flying Cars Instanced Mesh ──────────────────────────────────────────────
-const carCount = 80;
-const carGeom = new THREE.BoxGeometry(0.24, 0.12, 1.4);
+const carCount = 85;
+const carGeom = new THREE.BoxGeometry(0.25, 0.12, 1.5);
+// Basic material so cars glow under bloom
 const carMat = new THREE.MeshBasicMaterial({
     transparent: true,
-    opacity: 0.98
+    opacity: 0.95
 });
 const carMesh = new THREE.InstancedMesh(carGeom, carMat, carCount);
 
@@ -160,16 +188,17 @@ const carsData = [];
 const neonColors = [
     new THREE.Color(0x00f3ff), // Cyan
     new THREE.Color(0xff00ff), // Fuchsia
-    new THREE.Color(0xeab308)  // Yellow
+    new THREE.Color(0xeab308), // Yellow
+    new THREE.Color(0xffffff)  // White
 ];
 
 for (let i = 0; i < carCount; i++) {
     // Arrange cars in flight corridors/lanes
     const isLeft = Math.random() > 0.5;
-    const laneX = isLeft ? -8 - Math.random() * 12 : 8 + Math.random() * 12;
-    const laneY = 3 + Math.random() * 20; // fly at different altitudes
+    const laneX = isLeft ? -10 - Math.random() * 15 : 10 + Math.random() * 15;
+    const laneY = 4 + Math.random() * 22; // fly at different altitudes
     const startZ = -120 + Math.random() * 240; // spread along flight axis
-    const speed = 0.55 + Math.random() * 0.95;
+    const speed = 0.6 + Math.random() * 0.8;
     const direction = isLeft ? 1 : -1; // opposite traffic flow
 
     carsData.push({
@@ -224,16 +253,86 @@ function animate() {
 }
 animate();
 
-// ── GSAP Entrance Transitions ───────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-    gsap.to('#terminal-pane', {
-        opacity: 1,
-        scale: 1,
-        y: 0,
-        duration: 1.2,
-        ease: 'power4.out',
-        delay: 0.1
+// Helper for terminal-style typing effect
+function typeText(element, text, speed) {
+    return new Promise((resolve) => {
+        let i = 0;
+        element.innerHTML = '';
+        function nextChar() {
+            if (i < text.length) {
+                element.innerHTML += text.charAt(i);
+                i++;
+                setTimeout(nextChar, speed);
+            } else {
+                resolve();
+            }
+        }
+        nextChar();
     });
+}
+
+// ── GSAP Boot Sequence & UI Reveal ──────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    const bootToast = document.getElementById('boot-notification');
+    const line1 = document.getElementById('boot-line1');
+    const line2 = document.getElementById('boot-line2');
+    const mainPane = document.getElementById('terminal-pane');
+
+    if (!bootToast || !line1 || !line2 || !mainPane) {
+        console.error('[SYSTEM_ERR] One of the UI elements is missing.');
+        return;
+    }
+
+    // Set initial state
+    gsap.set(bootToast, { x: '125%', opacity: 0 });
+    gsap.set(mainPane, { opacity: 0, scale: 0.95 });
+
+    // 1. Boot Toast Entrance (Glitchy slide in)
+    const tl = gsap.timeline({
+        onComplete: startBootTyping
+    });
+
+    tl.to(bootToast, { opacity: 1, duration: 0.05, repeat: 3, yoyo: true })
+      .to(bootToast, { x: '-20px', opacity: 1, duration: 0.25, ease: 'power2.out' })
+      .to(bootToast, { x: '10px', duration: 0.1, ease: 'power1.inOut' })
+      .to(bootToast, { x: '0px', duration: 0.1, ease: 'bounce.out' });
+
+    async function startBootTyping() {
+        // Type connection line
+        await typeText(line1, '> VECTRA_HUB // CONNECTION ESTABLISHED...', 30);
+        await new Promise(r => setTimeout(r, 400));
+        
+        // Type security line
+        await typeText(line2, '> ENCRYPTED TUNNEL SECURED.', 25);
+        
+        // Hold for 3 seconds
+        setTimeout(exitBootToast, 3000);
+    }
+
+    function exitBootToast() {
+        const exitTl = gsap.timeline({
+            onComplete: () => {
+                bootToast.style.display = 'none';
+                revealMainUI();
+            }
+        });
+
+        // Glitch exit
+        exitTl.to(bootToast, { x: '-15px', opacity: 0.7, duration: 0.05 })
+              .to(bootToast, { x: '12px', opacity: 0.2, duration: 0.05 })
+              .to(bootToast, { x: '-5px', opacity: 0.9, duration: 0.05 })
+              .to(bootToast, { x: '125%', opacity: 0, duration: 0.4, ease: 'power2.in' });
+    }
+
+    function revealMainUI() {
+        gsap.to(mainPane, {
+            opacity: 1,
+            scale: 1,
+            y: 0,
+            duration: 1.2,
+            ease: 'power4.out'
+        });
+    }
 });
 
 // ── Window Resize adjustments ────────────────────────────────────────────────

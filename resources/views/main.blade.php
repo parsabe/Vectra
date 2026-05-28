@@ -20,7 +20,17 @@
 
 <body class="bg-black text-white overflow-hidden select-none scanlines relative portal-page-body">
 
-    <!-- 1. The 3D Background (Night City & Flying Cars) -->
+    <!-- Cyberpunk Entry Notification (Boot Sequence) -->
+    <div id="boot-notification" class="fixed top-6 right-6 z-[50] flex flex-col gap-2 p-5 rounded-lg border border-cyan-500/30 bg-black/90 backdrop-blur-md shadow-[0_0_20px_rgba(0,243,255,0.2)] font-mono max-w-sm pointer-events-none transform translate-x-[125%] border-r-4 border-r-fuchsia-500">
+        <div class="flex items-center justify-between gap-4 border-b border-white/10 pb-2 mb-2">
+            <span class="text-[9px] tracking-widest text-fuchsia-500 font-bold uppercase animate-pulse">// SYSTEM_ACCESS</span>
+            <span class="text-[8px] text-neutral-400 uppercase tracking-wider font-mono">NODE_90x8</span>
+        </div>
+        <div id="boot-line1" class="text-xs text-cyan-400 font-bold min-h-[1.5em] leading-relaxed"></div>
+        <div id="boot-line2" class="text-[10px] text-fuchsia-400 font-bold min-h-[1.5em] leading-relaxed"></div>
+    </div>
+
+    <!-- 1. The 3D Background (Night City Vista) -->
     <canvas id="bg-city" class="fixed inset-0 w-full h-full z-[-10] block outline-none"></canvas>
 
     <!-- 2. The Dark Overlay (The Hovering Cover) -->
