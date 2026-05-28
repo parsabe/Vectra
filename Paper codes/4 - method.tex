@@ -1,0 +1,85 @@
+\section{METHODOLOGY}
+
+\subsection*{3.1 System Architecture Overview}
+The Vectra Spatial Computing Protocol is engineered upon a strictly decoupled, asynchronous client-server architecture. This design intentionally isolates the high-fidelity graphical presentation layer from the computationally expensive neural network inference layer. The primary objective of this separation is to ensure that the user's spatial environment remains highly responsive, maintaining real-time interactive framerates, while heavy artificial intelligence operations are executed systematically in the background.
+
+\vspace{0.3cm}
+\textbf{The Client-Side Presentation Layer:} \\
+The frontend operates entirely within a standard web browser, serving as the user's interactive viewport. It is strictly responsible for rendering the 3D Gaussian Splatting environment via the \texttt{gsplat.js} library, managing the Glassmorphism graphical user interface, and calculating client-side collision physics using \texttt{Cannon.js}. By design, this layer is exceptionally lightweight. It is restricted from executing any machine learning calculations, acting purely as a spatial terminal that captures user intent (such as bounding box coordinates or semantic text prompts) and renders the final injected digital assets.
+
+\vspace{0.3cm}
+\textbf{The Local GPU Forge (Backend Processing):} \\
+Operating autonomously from the browser is the backend inference engine, designated as the Local GPU Forge. Hosted on a local hardware environment (specifically targeting consumer-grade GPUs like the NVIDIA RTX 4060), this Python-based application utilizes FastAPI to serve as the computational core. It securely houses and sequences the large parameter model weights required for Semantic Segmentation (U2Net), rapid Text-to-Image generation (SDXL-Lightning), and Volumetric Forging (TripoSR). 
+
+\vspace{0.3cm}
+\textbf{Asynchronous Data Flow and Non-Blocking UX:} \\
+The critical mechanism bridging these two layers is an asynchronous, non-blocking data pipeline. When a user issues an Extraction or Creation command, the frontend transmits the lightweight data payload (JSON or base64 screenshots) to the backend and immediately returns to its rendering loop. The browser is explicitly programmed never to freeze or await synchronous thread completion. 
+
+Instead, the frontend utilizes localized state management—such as dynamic terminal progress indicators or translucent "Ghost" cursor meshes—to maintain user engagement. Simultaneously, the GPU Forge optimally cycles the AI models through VRAM, processes the geometric data, and ultimately transmits a highly optimized, lightweight \texttt{.glb} mesh file back to the client. As illustrated in Figure~\ref{fig:methoder}, this asynchronous orchestration guarantees that the user's spatial immersion is never bottlenecked by the inherent latency of deep learning tensor operations.
+
+\begin{figure*}[htbp] 
+    \centering
+    \includegraphics[width=\textwidth]{img/10.png}
+    \caption{Created by NotebookLM - High-level topology of the Vectra Protocol, illustrating the asynchronous decoupling of the lightweight client-side presentation layer from the heavy local GPU computational core.}
+    \label{fig:methoder}
+\end{figure*}
+
+\subsection*{3.2 Environment Acquisition \& Rendering}
+The foundational "Base Canvas" of the Vectra architecture is constructed from real-world spatial data rather than synthetic computer-aided design (CAD) models. The environment—a university hallway—is initially digitized using a combination of LiDAR scanning and high-density photogrammetry. This process yields a massive, unstructured point cloud representing the spatial geometry and color data of the physical space.
+
+To render this dense dataset within a standard web browser without exceeding client-side memory or compute limits, the raw point cloud is converted into a 3D Gaussian Splat representation. Unlike traditional polygonal meshes, Gaussian Splatting represents the scene as a collection of millions of overlapping, semi-transparent 3D ellipsoids (Gaussians). Each splat contains parameters for position, covariance (size and orientation), color (spherical harmonics), and opacity.
+
+This splat data is loaded and rendered client-side utilizing the \texttt{gsplat.js} library via WebGL. The rendering pipeline employs a tile-based rasterizer, efficiently projecting the 3D Gaussians onto the 2D viewing plane while mathematically sorting them by depth (alpha compositing). This approach bypasses the heavy polygon-rasterization bottleneck of traditional WebGL pipelines, allowing the browser to render highly photorealistic, navigable environments at real-time framerates (60+ FPS) while maintaining a low computational footprint.
+
+\vspace{0.3cm}
+\subsection*{3.3 The Generative Extraction Pipeline (Image-to-3D)}
+The Extraction Protocol (Scenario 1) is designed to convert static visual data from the rendered Gaussian environment into dynamic, independent 3D assets. This is achieved through a two-stage generative pipeline: Semantic Segmentation followed by Volumetric Forging.
+
+\vspace{0.2cm}
+\textbf{Stage 1: Semantic Segmentation and Masking} \\
+When a user defines a bounding box around a target object in the viewport, a 2D screenshot of that specific region is transmitted to the GPU Forge. The first computational requirement is isolating the object from its background environment. The system utilizes a CUDA-accelerated \texttt{U\textsuperscript{2}-Net} architecture (via the \texttt{rembg} framework) to perform semantic boundary detection. 
+
+The inference model outputs a precise alpha mask of the object. Crucially, the pipeline enforces a "Solid Alpha Flattening" protocol before passing the image to the next stage. Any transparent pixels in the isolated image are strictly converted to a pure white (\texttt{RGB 255,255,255}) background. This is a vital computational necessity; generative 3D models (like TripoSR) analyze the silhouette and boundary gradients of an image to infer depth. If residual transparency or environment noise is fed into the model's tokenizer, it triggers normalization errors, resulting in flattened or corrupted geometric outputs (often referred to as the "blob artifact"). 
+
+\vspace{0.2cm}
+\textbf{Stage 2: Volumetric Forging (TripoSR Inference)} \\
+The cleanly segmented, white-background image is then ingested by the Volumetric Forging engine, powered by the TripoSR neural network. This model, functioning within the local VRAM, utilizes a transformer-based architecture to project the 2D pixel data into a triplane representation—a set of three orthogonal feature planes that encode the spatial volume.
+
+A NeRF (Neural Radiance Field) decoder network then queries this triplane feature space to predict the density and color of points in the 3D volume. Finally, the marching cubes algorithm is applied to extract a contiguous polygonal surface from the volumetric density field, effectively extruding the 2D image into a standard 3D vertex geometry. The resulting model is exported as a lightweight \texttt{.glb} file, containing both the geometric mesh and the UV-mapped texture data, ready for injection back into the client environment. The complete generative extraction pipeline is visualized in Appendix A.1 (Figure~\ref{fig:imgto3d}).
+
+\subsection*{3.4 Deep Splat Excavation (DBSE) \& Spatial Injection}
+The core innovation enabling Scenario 1 is the Deep Splat Excavation (DBSE) algorithm, which solves the spatial occlusion problem inherent to manipulating dense point clouds. Because a Gaussian Splat environment is essentially a solid block of rendered volumes, simply spawning a new 3D mesh over an existing object results in visual clipping and Z-fighting. The environment must be surgically "hole-punched."
+
+\vspace{1em}
+\textbf{Raycasting and Volume Definition:} \\
+When the user draws a 2D bounding box on the screen, the client application utilizes the camera's projection matrix to cast a frustum of rays into the 3D scene. By analyzing the Z-Buffer (depth map) generated during the rasterization of the Gaussian splats, the system calculates the minimum and maximum depth values within the bounding box, defining a localized 3D volumetric bounding region.
+
+\vspace{1em}
+\textbf{Occlusion Masking (The "Hole-Punch"):} \\
+Rather than destructively deleting data from the source \texttt{.ply} file, DBSE employs a non-destructive shader-level occlusion mask. The rendering engine evaluates the spatial coordinates of every Gaussian splat against the defined 3D volume. Splats whose coordinates fall within the intersection are dynamically flagged, and their opacity (alpha) values are overridden to zero in the fragment shader. This instantly excavates a clean void in the environment. Finally, the newly forged \texttt{.glb} mesh is injected, using the centroid of the excavated volume as its absolute origin, resulting in a seamless spatial replacement. 
+
+The Deep Splat Excavation spatial masking process, alongside its formal algorithmic logic (Algorithm~\ref{alg:dbse_interaction}) and corresponding client-side code implementation, is detailed in Appendix A.1 (Figure~\ref{fig:dbselogo}).
+
+\vspace{1em}
+\subsection*{3.5 The Local Summoning Engine (Text-to-3D)}
+The Creation Protocol (Scenario 2) transitions the system from extraction to pure semantic generation. To adhere to strict Edge Computing paradigms, this entire pipeline operates on a local consumer-grade GPU (NVIDIA RTX 4060 with 8GB VRAM). The primary engineering challenge is preventing Out-Of-Memory (OOM) kernel panics when orchestrating multiple heavy neural networks.
+
+\vspace{1em}
+\textbf{Sequential VRAM Orchestration:} \\
+The architecture employs a highly constrained, sequential loading strategy. First, the "Brain" (\texttt{SDXL-Lightning}) is loaded into memory to generate the 2D image from the user's text prompt. To minimize the memory footprint, the model weights are strictly cast to half-precision floating-point format (\texttt{torch.float16}), reducing VRAM utilization by 50\% without significant loss in feature fidelity. 
+
+\vspace{1em}
+\textbf{Memory Flushing and The "Body" Inference:} \\
+The moment the 2D image tensor is generated and saved, the \texttt{SDXL-Lightning} pipeline is purged. The system executes \texttt{torch.cuda.empty\_cache()} and invokes Python's garbage collector to forcefully reclaim the VRAM. Only after the GPU memory ceiling drops back to baseline does the system load the "Body" (TripoSR) into CUDA to execute the volumetric forging. This aggressive memory management guarantees that the 8GB VRAM limit is never breached, ensuring stable, continuous local generation. The sequential VRAM orchestration strategy is mapped in Appendix A.2 (Figure~\ref{fig:txt23d}).
+
+\vspace{0.3cm}
+\subsection*{3.6 Interactive Kinematics \& Middleware Integration}
+To actualize Scenario 3, the digital twin must exhibit physical reactivity. Because Gaussian splats are purely graphical representations devoid of physical properties (vertices, edges, or faces), physical interactions are achieved by decoupling the visual rendering from an invisible, client-side physics simulation powered by \texttt{Cannon.js}.
+
+\vspace{0.2cm}
+\textbf{Collider Mapping and Static Geometry:} \\
+Upon initialization, the system parses the bounds of the scanned hallway. Using a heuristic approach based on the lowest splat density coordinates (the floor) and vertical boundary clusters (the walls), the system generates invisible, rudimentary geometric colliders (planes and bounding boxes). These are registered into the \texttt{Cannon.js} world as \textit{Static Rigidbodies} (infinite mass), establishing the unyielding physical boundaries of the simulation.
+
+\vspace{0.2cm}
+\textbf{Dynamic Instantiation:} \\
+When a synthetic \texttt{.glb} file is spawned into the scene, a corresponding \textit{Dynamic Rigidbody} is instantly instantiated in the physics middleware. The system assigns a localized bounding box collider, a simulated mass, restitution (bounciness), and friction coefficients. As the physics engine calculates gravity and collision impulses per frame, it outputs a transformation matrix (position and quaternion rotation) which is continuously synced to the visual \texttt{.glb} mesh in \texttt{Three.js}, allowing the user to seamlessly throw, drop, and interact with the AI-generated assets within the scanned environment.

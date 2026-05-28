@@ -1,0 +1,113 @@
+\documentclass[a4paper, 10pt]{article}
+
+% ==========================================
+% 1. PAGE GEOMETRY & LAYOUT
+% ==========================================
+\usepackage[left=1.5cm, right=1.5cm, top=2cm, bottom=2cm]{geometry} 
+\usepackage{multicol} 
+\setlength{\columnsep}{1cm} 
+
+% ==========================================
+% 2. TYPOGRAPHY & MATH FONTS
+% ==========================================
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath} % Load amsmath BEFORE mathdesign
+\usepackage[bitstream-charter]{mathdesign}
+\usepackage{microtype} % Improves text justification and spacing
+
+% ==========================================
+% 3. GRAPHICS & FLOATS (Images & Tables)
+% ==========================================
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{float} % Required for forcing image/algorithm placement with [H]
+
+% ==========================================
+% 4. ALGORITHMS
+% ==========================================
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+% ==========================================
+% 5. SOURCE CODE LISTINGS (Dynamic Tomorrow Night Blue - No Background)
+% ==========================================
+\usepackage{xcolor}
+\usepackage{listings}
+
+% Adapted Tomorrow Night Blue palette for a white/transparent background
+\definecolor{tnbText}{HTML}{002451}      % Signature Deep Blue (Main Text)
+\definecolor{tnbComment}{HTML}{7285b7}   % Soft Blue-Grey (Comments)
+\definecolor{tnbKeyword}{HTML}{8959a8}   % Dynamic Purple (Keywords)
+\definecolor{tnbString}{HTML}{3e999f}    % Teal/Aqua (Strings)
+\definecolor{tnbNumber}{HTML}{f5871f}    % Orange (Numbers)
+
+% Define the crisp JS Style
+\lstdefinestyle{jsStyle}{
+    language=Java, % Uses Java base for JS syntax highlighting
+    basicstyle=\ttfamily\small\color{tnbText},
+    backgroundcolor=, % BLANK = NO BACKGROUND COLOR
+    commentstyle=\color{tnbComment}\itshape,
+    keywordstyle=\color{tnbKeyword}\bfseries,
+    stringstyle=\color{tnbString},
+    numberstyle=\tiny\color{tnbNumber},
+    identifierstyle=\color{tnbText},
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    frame=single,
+    rulecolor=\color{tnbComment}, % Makes the border line a soft blue-grey
+    captionpos=b,                    
+    keepspaces=true,                 
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+% Apply the style globally
+\lstset{style=jsStyle}
+
+% ==========================================
+% 6. BIBLIOGRAPHY (IEEE Style)
+% ==========================================
+\usepackage[style=ieee, sorting=none]{biblatex} 
+\addbibresource{references.bib} 
+
+% ==========================================
+% 7. HYPERLINKS (MUST ALWAYS BE LAST!)
+% ==========================================
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,   % Removes ugly default boxes
+    linkcolor=cyan,    % Color for internal links (Figures, Sections)
+    citecolor=cyan,    % Color for citations [1]
+    urlcolor=cyan      % Color for web URLs
+}
+
+\begin{document}
+% ==========================================
+% 1-COLUMN SECTION (Full Width)
+% ==========================================
+\input{0 - title}
+% Anything placed here, like your title and teaser image, spans the whole page.
+
+\begin{multicols}{2}
+
+\input{1 - abstract}
+\input{2 - Introduction}
+\input{3 - related-work}
+\input{4 - method}
+\input{5 - experiments}
+\input{6 - discussion}
+\input{7 - conclusion}
+\input{8 - ai}
+
+
+
+\end{multicols}
+
+
+\printbibliography
+
+\input{appendix}
+
+\end{document}

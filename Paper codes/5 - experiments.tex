@@ -1,0 +1,26 @@
+\section{EXPERIMENTS AND SYSTEM EVALUATION}
+
+\subsection{Experimental Setup and Hardware Parameters}
+To rigorously evaluate the performance and stability of the Vectra Spatial Computing Protocol, the system was deployed within a constrained, local edge-computing environment. The computational core was hosted on a consumer-grade workstation equipped with an NVIDIA RTX 4060 graphics processing unit, strictly limited to 8GB of VRAM. 
+
+The spatial interface was established utilizing the Three.js library alongside a specialized WebGL Gaussian splatting viewer. The initial baseline environment consisted of a high-density point cloud representation of a university hallway, allowing for the observation of memory consumption and rendering latency prior to the injection of generated synthetic assets. 
+
+\subsection{Algorithmic Implementation: Interactive Extraction}
+The critical bridge between the visual presentation layer and the backend inference engine is the interactive selection protocol. Rather than relying on computationally expensive 3D raycasting against millions of individual splat nodes for object isolation, the system employs a highly optimized 2D viewport slicing mechanism. 
+
+To execute the extraction, a 2D bounding box is mapped directly to the WebGL canvas pixel coordinates. Upon selection, the system temporarily isolates the rendering canvas by disabling environmental variables (such as fog and grid helpers), captures the pure pixel data via an off-screen buffer, and transmits the resulting image array to the local backend. 
+
+The complete client-side execution logic is formalized in Algorithm~\ref{alg:dbse_interaction}. For a comprehensive technical reference, including the visual flowcharts of the extraction pipeline and the raw JavaScript implementation (\texttt{captureSelectionSnapshot}), the reader is directed to Appendix A.1.
+
+\vspace{0.3cm}
+\subsection{System Performance and Latency Metrics}
+To validate the asynchronous decoupling of the frontend and backend, system telemetry was continuously monitored during the execution of both the Extraction (Image-to-3D) and Creation (Text-to-3D) protocols. 
+
+\begin{itemize}
+    \item \textbf{Rendering Stability:} During idle states, the client-side viewport maintained a stable framerate of \textbf{60 FPS} on a standard machine. During active inference, because the rendering loop is non-blocking, framerates experienced a minimal degradation to \textbf{30 FPS}, maintaining real-time navigability. 
+    \item \textbf{Pipeline Latency:} The total round-trip time from the transmission of the viewport slice to the injection of the fully textured $M_{glb}$ mesh averaged \textbf{120.2 seconds}.
+    \item \textbf{Memory Utilization:} The aggressive VRAM flushing protocol ensured that peak memory consumption during the TripoSR volumetric forging phase never exceeded \textbf{7.8 GB}, successfully preventing out-of-memory (OOM) kernel panics. The precise asynchronous fetch requests and memory purging sequence driving this orchestration are documented in Appendix A.2, alongside the VRAM lifecycle diagram.
+\end{itemize}
+
+\subsection{Qualitative Evaluation of Spatial Integration}
+Beyond raw computational metrics, the success of the protocol is defined by the visual coherence of the injected assets. Standard additive insertion methods resulted in severe Z-fighting and geometric intersection with the dense hallway point cloud. The application of the non-destructive occlusion mask successfully excavated the necessary volumetric space, resulting in seamless integration of the AI-generated meshes into the digitized physical environment.

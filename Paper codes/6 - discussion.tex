@@ -1,0 +1,22 @@
+\section{DISCUSSION}
+
+The experimental evaluation of the Vectra Spatial Computing Protocol demonstrated the successful deployment of a strictly decoupled, edge-computed spatial architecture. The methodology validated that complex generative pipelines, specifically the Deep Splat Excavation (DBSE) algorithm and the sequential VRAM orchestration strategy, can successfully operate within standard consumer-grade web browsers and hardware limits. However, the practical application of these theoretical frameworks revealed distinct constraints that necessitate further algorithmic refinement.
+
+\subsection{Limitations and Hardware Constraints}
+The most prominent limitation encountered during the system's evaluation was the strict hardware threshold imposed by the local edge-computing environment. Because the Local GPU Forge was restricted to an NVIDIA RTX 4060 with only 8GB of VRAM, simultaneous execution of the neural network models was physically impossible. 
+
+While the sequential VRAM flushing protocol successfully prevented Out-Of-Memory (OOM) kernel panics, this aggressive memory management introduced inherent pipeline latency. The total round-trip extraction time was significantly bottlenecked by the necessary continuous purging and reloading of the SDXL-Lightning and TripoSR model weights into CUDA memory. 
+
+Furthermore, a generative limitation was observed within the semantic masking stage of the Image-to-3D pipeline. The TripoSR volumetric forging model proved highly sensitive to residual noise. If the U\textsuperscript{2}-Net boundary detection failed to perfectly isolate the 2D object against a pure white background, the resulting 3D geometry exhibited severe flattening or "blob artifacts," demonstrating a fragility in the zero-shot generalization capabilities of the current pipeline. Finally, the physical interaction middleware (\texttt{Cannon.js}) was restricted to rudimentary bounding-box colliders, lacking the capacity for granular, pixel-perfect mesh collisions against the complex Gaussian Splat geometry.
+
+\subsection{Future Work and Technical Implementations}
+Future iterations of the Vectra Protocol will focus on mitigating these hardware and generative constraints through distributed architecture and advanced physical logic. 
+
+First, the protocol will be expanded to support High-Performance Computing (HPC) cluster offloading. By leveraging parallel programming frameworks (such as CUDA streams and MPI), the heavy volumetric forging processes could be dynamically routed to dedicated university tensor-core nodes, while the local consumer GPU is reserved exclusively for the lightweight semantic segmentation and viewport management. This hybrid edge-cloud architecture would virtually eliminate the sequential loading latency.
+
+Secondly, future implementations will prioritize the integration of rigorous Mathematical Safeguards within the spatial engine. Rather than relying on simple bounding boxes, Control Barrier Functions (CBFs) will be mathematically mapped to the unyielding coordinates of the Gaussian Splats. This will ensure that AI-generated dynamic meshes are mathematically prevented from intersecting with critical spatial coordinates, ensuring absolute physical alignment and collision security within the digital twin.
+
+\subsection{Broader Implications and AI Security}
+The integration of generative artificial intelligence directly into scanned spatial environments represents a significant paradigm shift in how digital twins are interacted with and manipulated. By proving that 3D assets can be semantically extracted and summoned using decentralized, offline consumer hardware, the Vectra Protocol establishes a foundational layer for localized spatial computing. 
+
+Crucially, the development of the Deep Splat Excavation (DBSE) algorithm proves that AI-generated data can be seamlessly merged with real-world geometric scans without destructive overwriting. As spatial computing interfaces become ubiquitous, embedding Applied AI Security Frameworks directly into the rendering pipeline—ensuring that generated models remain visually coherent, structurally safe, and localized to the user's private hardware—will become a critical necessity for future architectural and engineering software.
