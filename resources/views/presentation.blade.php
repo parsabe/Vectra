@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="scroll-smooth">
+<html lang="en" class="scroll-smooth presentation-page-html">
 
 <head>
     <meta charset="UTF-8">
@@ -23,112 +23,9 @@
 
     <!-- Compiled assets via Laravel Vite -->
     @vite(['resources/css/app.css', 'resources/js/presentation.js'])
-
-    <style>
-        /* Force scrollability on window but disable native CSS scroll snapping to avoid Lenis conflict */
-        html, body {
-            height: auto !important;
-            overflow-y: visible !important;
-            overflow-x: hidden !important;
-            background-color: #020204;
-            margin: 0;
-            padding: 0;
-            scroll-behavior: auto !important; /* Lenis handles smoothing */
-        }
-
-        /* 100vh full-screen absolute section slide overlays */
-        .scrolly-section {
-            position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            opacity: 0;
-            pointer-events: none;
-            box-sizing: border-box;
-            z-index: 10;
-        }
-
-        /* Borderless glassmorphism overlays with strong text shadowing for readability */
-        .floating-pane {
-            background: transparent !important;
-            border: none !important;
-            box-shadow: none !important;
-            text-shadow: 0 4px 20px rgba(0, 0, 0, 0.98), 0 2px 6px rgba(0, 0, 0, 0.95);
-        }
-
-        /* Overrides to make KaTeX formulas pure white, large, and scrollable if they exceed container bounds */
-        .math-block {
-            color: #ffffff !important;
-            font-size: 1.35rem !important; /* Large, extremely clear formulas */
-            line-height: 1.6;
-            text-align: center;
-            width: 100%;
-            overflow-x: auto;
-            overflow-y: hidden;
-            margin: 1.25rem 0 !important;
-            padding: 0.85rem 1rem !important;
-            background: rgba(255, 255, 255, 0.03) !important;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: 8px;
-        }
-        
-        .math-block .katex {
-            color: #ffffff !important;
-        }
-        
-        .math-block .katex-display {
-            margin: 0 !important;
-        }
-
-        .text-glow-cyan {
-            color: #00f3ff;
-            text-shadow: 0 0 10px rgba(0, 243, 255, 0.7), 0 4px 12px rgba(0, 0, 0, 0.9);
-        }
-        
-        .text-glow-magenta {
-            color: #ff00ff;
-            text-shadow: 0 0 10px rgba(255, 0, 255, 0.7), 0 4px 12px rgba(0, 0, 0, 0.9);
-        }
-        
-        .text-glow-yellow {
-            color: #eab308;
-            text-shadow: 0 0 10px rgba(234, 179, 8, 0.7), 0 4px 12px rgba(0, 0, 0, 0.9);
-        }
-
-        /* Flowchart animation lines */
-        .flow-line {
-            stroke-dasharray: 8;
-            animation: flowDash 20s linear infinite;
-        }
-        @keyframes flowDash {
-            to {
-                stroke-dashoffset: -1000;
-            }
-        }
-
-        /* Nav Dots Indicator (Passive/Non-clickable) */
-        .nav-dot {
-            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .nav-dot.active {
-            background-color: #ffffff;
-            border-color: #ffffff;
-            box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
-            transform: scale(1.35);
-        }
-        
-        /* Disable text selection during presentation navigation */
-        .no-select {
-            user-select: none;
-            -webkit-user-select: none;
-        }
-    </style>
 </head>
 
-<body class="bg-black text-white no-select overflow-x-hidden font-sans relative">
+<body class="bg-black text-white no-select overflow-x-hidden font-sans relative presentation-page-body">
 
     <!-- Scrollable container providing height for the pinning mechanism -->
     <div id="scroll-container" class="relative w-full h-[1600vh]">
@@ -495,21 +392,6 @@
             integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" 
             crossorigin="anonymous" 
             onload="initializeKatex()"></script>
-
-    <script>
-        // Callback function to initialize KaTeX when auto-render loads
-        function initializeKatex() {
-            renderMathInElement(document.body, {
-                delimiters: [
-                    {left: "$$", right: "$$", display: true},
-                    {left: "$", right: "$", display: false},
-                    {left: "\\(", right: "\\)", display: false},
-                    {left: "\\[", right: "\\]", display: true}
-                ],
-                throwOnError: false
-            });
-        }
-    </script>
 </body>
 
 </html>

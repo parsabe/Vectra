@@ -289,6 +289,188 @@ body {
     transform: translateY(1px);
 }
 
+/* ── VECTRA PORTAL HUB & PRESENTATION SYSTEMS ── */
+
+/* 1. Main Portal Hub Layout */
+.portal-page-body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: #020204;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* Borderless glassmorphism card */
+.glass-terminal {
+    background: rgba(4, 4, 8, 0.45);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.text-glow-white {
+    color: #ffffff;
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+}
+
+/* Cyberpunk Glitch Hover Effect */
+.glitch-link {
+    position: relative;
+    display: block;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    border-left: 2px solid transparent;
+    padding-left: 1rem;
+}
+
+.glitch-link::before {
+    content: attr(data-text);
+    position: absolute;
+    left: 1rem;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    color: #ff00ff;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0); 
+    pointer-events: none;
+}
+
+.glitch-link:hover {
+    color: #00f3ff;
+    border-left-color: #00f3ff;
+    text-shadow: 0 0 8px rgba(0, 243, 255, 0.8);
+    transform: translateX(6px);
+}
+
+.glitch-link:hover::before {
+    animation: glitch-anim 1s infinite linear alternate-reverse;
+    clip: rect(0, 900px, 0, 0); 
+    left: calc(1rem + 2px);
+}
+
+@keyframes glitch-anim {
+    0% { clip: rect(12px, 9999px, 66px, 0); transform: skew(0.5deg); }
+    10% { clip: rect(34px, 9999px, 5px, 0); transform: skew(-0.8deg); }
+    20% { clip: rect(70px, 9999px, 105px, 0); transform: skew(0.3deg); }
+    30% { clip: rect(5px, 9999px, 45px, 0); transform: skew(-0.5deg); }
+    40% { clip: rect(98px, 9999px, 13px, 0); transform: skew(0.9deg); }
+    50% { clip: rect(44px, 9999px, 99px, 0); transform: skew(-0.2deg); }
+    60% { clip: rect(15px, 9999px, 30px, 0); transform: skew(0.6deg); }
+    70% { clip: rect(80px, 9999px, 55px, 0); transform: skew(-0.4deg); }
+    80% { clip: rect(25px, 9999px, 85px, 0); transform: skew(0.2deg); }
+    90% { clip: rect(60px, 9999px, 15px, 0); transform: skew(-0.7deg); }
+    100% { clip: rect(90px, 9999px, 120px, 0); transform: skew(0.1deg); }
+}
+
+/* Scanlines overlay effect */
+.scanlines::after {
+    content: " ";
+    display: block;
+    position: absolute;
+    top: 0; left: 0; bottom: 0; right: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+    z-index: 20;
+    background-size: 100% 4px, 6px 100%;
+    pointer-events: none;
+}
+
+/* 2. Scrollytelling Presentation Override Styles */
+.presentation-page-html, .presentation-page-body {
+    height: auto !important;
+    overflow-y: visible !important;
+    overflow-x: hidden !important;
+    background-color: #020204;
+    margin: 0;
+    padding: 0;
+    scroll-behavior: auto !important;
+}
+
+.scrolly-section {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    box-sizing: border-box;
+    z-index: 10;
+}
+
+.floating-pane {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    text-shadow: 0 4px 20px rgba(0, 0, 0, 0.98), 0 2px 6px rgba(0, 0, 0, 0.95);
+}
+
+.math-block {
+    color: #ffffff !important;
+    font-size: 1.35rem !important;
+    line-height: 1.6;
+    text-align: center;
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    margin: 1.25rem 0 !important;
+    padding: 0.85rem 1rem !important;
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+}
+
+.math-block .katex {
+    color: #ffffff !important;
+}
+
+.math-block .katex-display {
+    margin: 0 !important;
+}
+
+.text-glow-cyan-pres {
+    color: #00f3ff;
+    text-shadow: 0 0 10px rgba(0, 243, 255, 0.7), 0 4px 12px rgba(0, 0, 0, 0.9);
+}
+
+.text-glow-magenta-pres {
+    color: #ff00ff;
+    text-shadow: 0 0 10px rgba(255, 0, 255, 0.7), 0 4px 12px rgba(0, 0, 0, 0.9);
+}
+
+.text-glow-yellow-pres {
+    color: #eab308;
+    text-shadow: 0 0 10px rgba(234, 179, 8, 0.7), 0 4px 12px rgba(0, 0, 0, 0.9);
+}
+
+.flow-line {
+    stroke-dasharray: 8;
+    animation: flowDash 20s linear infinite;
+}
+
+@keyframes flowDash {
+    to { stroke-dashoffset: -1000; }
+}
+
+.nav-dot {
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.nav-dot.active {
+    background-color: #ffffff;
+    border-color: #ffffff;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+    transform: scale(1.35);
+}
+
+.no-select {
+    user-select: none;
+    -webkit-user-select: none;
+}
+
 /* ── Selection Canvas cursor ── */
 #selection-canvas.select-drawing-mode {
     cursor: crosshair !important;

@@ -11,6 +11,21 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 // Register GSAP plugins
 gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
 
+// Expose KaTeX auto-renderer globally
+window.initializeKatex = function() {
+    if (typeof renderMathInElement === 'function') {
+        renderMathInElement(document.body, {
+            delimiters: [
+                {left: "$$", right: "$$", display: true},
+                {left: "$", right: "$", display: false},
+                {left: "\\(", right: "\\)", display: false},
+                {left: "\\[", right: "\\]", display: true}
+            ],
+            throwOnError: false
+        });
+    }
+};
+
 console.log('%c[VECTRA PRESENTATION] Initializing 16-Stage Bloom Scrollytelling Engine...', 'color: #ffffff; font-weight: bold;');
 
 // DOM Elements
