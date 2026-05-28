@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { ScrollToPlugin } from 'gsap/ScrollToPlugin';
 
-// Register GSAP ScrollTrigger plugin
-gsap.registerPlugin(ScrollTrigger);
+// Register GSAP plugins
+gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
 
-console.log('%c[VECTRA PRESENTATION] Initializing Smooth Kinetic Scrollytelling Engine...', 'color: #39ff14; font-weight: bold;');
+console.log('%c[VECTRA PRESENTATION] Initializing Saturn 3D Snapping Engine...', 'color: #00f3ff; font-weight: bold;');
 
 // DOM Elements
 const canvas = document.getElementById('webgl-canvas');
@@ -14,23 +15,23 @@ if (!canvas) {
 }
 
 // ── Lenis Smooth Scrolling Setup ─────────────────────────────────────────────
-// Setup Lenis smooth scroll for a premium, buttery feel (like peachweb.io)
+// Setup Lenis to work alongside snapping layout
 const lenis = new Lenis({
-    duration: 1.4,
-    easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), // smooth exponential out
+    duration: 1.2,
+    easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
     direction: 'vertical',
     gestureDirection: 'vertical',
     smooth: true,
-    mouseMultiplier: 0.95,
+    mouseMultiplier: 0.9,
     smoothTouch: false,
     touchMultiplier: 1.5,
     infinite: false,
 });
 
-// Update ScrollTrigger on Lenis scroll tick
+// Update ScrollTrigger on Lenis scroll
 lenis.on('scroll', ScrollTrigger.update);
 
-// Sync GSAP ticker with Lenis requestAnimationFrame loop
+// Sync GSAP ticker with Lenis raf
 gsap.ticker.add((time) => {
     lenis.raf(time * 1000);
 });
@@ -39,13 +40,13 @@ gsap.ticker.lagSmoothing(0);
 // ── Three.js Scene Configuration ─────────────────────────────────────────────
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x020204);
-scene.fog = new THREE.FogExp2(0x020204, 0.015); // Volumetric depths fog
+scene.fog = new THREE.FogExp2(0x020204, 0.022); // deep space volumetric fog
 
 // Camera setup
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 500);
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 500);
 
 // Camera Target coordinate vector (used in lookAt loop)
-const cameraTarget = new THREE.Vector3(0, 1.5, 0);
+const cameraTarget = new THREE.Vector3(0, 0, 0);
 
 // WebGL Renderer Setup
 const renderer = new THREE.WebGLRenderer({
@@ -57,224 +58,196 @@ const renderer = new THREE.WebGLRenderer({
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-// ── Lights Setup ─────────────────────────────────────────────────────────────
-const ambientLight = new THREE.AmbientLight(0x0a0d14, 1.8);
+// ── Space Lights Setup ───────────────────────────────────────────────────────
+const ambientLight = new THREE.AmbientLight(0x0a0c16, 2.5);
 scene.add(ambientLight);
 
-// Neon colored floating point lights
-const cyanLight = new THREE.PointLight(0x00f3ff, 5, 55);
-cyanLight.position.set(-6, 3, 20);
+// Neon colored spotlight rigs
+const cyanLight = new THREE.PointLight(0x00f3ff, 6, 60);
+cyanLight.position.set(-8, 4, 15);
 scene.add(cyanLight);
 
-const magentaLight = new THREE.PointLight(0xff00ff, 5, 55);
-magentaLight.position.set(6, 3, -30);
+const magentaLight = new THREE.PointLight(0xff00ff, 1, 60);
+magentaLight.position.set(8, -4, -10);
 scene.add(magentaLight);
 
-const yellowLight = new THREE.PointLight(0xeab308, 4, 45);
-yellowLight.position.set(0, 5, -80);
+const yellowLight = new THREE.PointLight(0xeab308, 1, 50);
+yellowLight.position.set(0, 6, -15);
 scene.add(yellowLight);
 
-// ── Procedural Environment (Quarantine Matrix) ───────────────────────────────
-// Technical ground grid
-const gridHelper = new THREE.GridHelper(300, 120, 0xff00ff, 0x00f3ff);
-gridHelper.position.y = -2.5;
-scene.add(gridHelper);
+// Directional rim light to highlight planet curves
+const rimLight = new THREE.DirectionalLight(0xffffff, 1.5);
+rimLight.position.set(5, 5, -10);
+scene.add(rimLight);
 
-// Twistable wireframe corridor tunnel
-const tunnelGroup = new THREE.Group();
-const numGates = 35;
-const gateSpacing = 6.5;
+// ── Procedural Starfield background ──────────────────────────────────────────
+const starCount = 2000;
+const starGeometry = new THREE.BufferGeometry();
+const starPositions = new Float32Array(starCount * 3);
 
-for (let i = 0; i < numGates; i++) {
-    const zPos = 35 - i * gateSpacing; // Z from 35 down to -192
-    const sizeWidth = 14 + Math.sin(i * 0.4) * 2;
-    const sizeHeight = 7.5 + Math.cos(i * 0.4) * 1.5;
-
-    const geom = new THREE.BoxGeometry(sizeWidth, sizeHeight, 2);
-    const edges = new THREE.EdgesGeometry(geom);
-
-    let themeColor;
-    if (i % 3 === 0) themeColor = 0x00f3ff;
-    else if (i % 3 === 1) themeColor = 0xff00ff;
-    else themeColor = 0xeab308;
-
-    const mat = new THREE.LineBasicMaterial({
-        color: themeColor,
-        transparent: true,
-        opacity: Math.max(0.42 - (i / numGates) * 0.28, 0.08)
-    });
-
-    const gate = new THREE.LineSegments(edges, mat);
-    gate.position.set(0, 1.25, zPos);
-    tunnelGroup.add(gate);
-}
-scene.add(tunnelGroup);
-
-// Volumetric Neural Particle Nodes (represent Gaussian splat coordinates)
-const particleCount = 3800;
-const particleGeometry = new THREE.BufferGeometry();
-const positions = new Float32Array(particleCount * 3);
-const colors = new Float32Array(particleCount * 3);
-
-const colorCyan = new THREE.Color(0x00f3ff);
-const colorMagenta = new THREE.Color(0xff00ff);
-const colorYellow = new THREE.Color(0xeab308);
-
-for (let i = 0; i < particleCount; i++) {
-    const theta = Math.random() * Math.PI * 2;
-    const radius = 5.0 + Math.random() * 16; // Distribution envelope
-    const x = Math.cos(theta) * radius;
-    const y = Math.sin(theta) * radius + 1.25;
-    const z = Math.random() * 250 - 190; // Z coordinates range
-
-    positions[i * 3] = x;
-    positions[i * 3 + 1] = y;
-    positions[i * 3 + 2] = z;
-
-    const rand = Math.random();
-    let pColor;
-    if (rand < 0.45) {
-        pColor = colorCyan;
-    } else if (rand < 0.85) {
-        pColor = colorMagenta;
-    } else {
-        pColor = colorYellow;
-    }
-
-    colors[i * 3] = pColor.r;
-    colors[i * 3 + 1] = pColor.g;
-    colors[i * 3 + 2] = pColor.b;
+for (let i = 0; i < starCount; i++) {
+    // Distribute stars in a large hollow sphere
+    const radius = 120 + Math.random() * 80;
+    const u = Math.random();
+    const v = Math.random();
+    const theta = u * 2.0 * Math.PI;
+    const phi = Math.acos(2.0 * v - 1.0);
+    
+    starPositions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+    starPositions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+    starPositions[i * 3 + 2] = radius * Math.cos(phi);
 }
 
-particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-particleGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-// Glowing circular particle texture via Canvas
-const pCanvas = document.createElement('canvas');
-pCanvas.width = 16;
-pCanvas.height = 16;
-const pCtx = pCanvas.getContext('2d');
-const gradient = pCtx.createRadialGradient(8, 8, 0, 8, 8, 8);
-gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-gradient.addColorStop(0.35, 'rgba(255, 255, 255, 0.8)');
-gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-pCtx.fillStyle = gradient;
-pCtx.fillRect(0, 0, 16, 16);
-const pTexture = new THREE.CanvasTexture(pCanvas);
-
-const particleMaterial = new THREE.PointsMaterial({
-    size: 0.3,
-    map: pTexture,
-    vertexColors: true,
+starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+const starMaterial = new THREE.PointsMaterial({
+    color: 0xffffff,
+    size: 0.35,
     transparent: true,
-    opacity: 0.88,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false
+    opacity: 0.55
 });
+const starfield = new THREE.Points(starGeometry, starMaterial);
+scene.add(starfield);
 
-const particleSystem = new THREE.Points(particleGeometry, particleMaterial);
-scene.add(particleSystem);
+// ── Saturn-Like Planet Creation ─────────────────────────────────────────────
+const planetGroup = new THREE.Group();
 
-// ── GSAP ScrollTrigger Collaborative Animations ──────────────────────────────
-// Define initial positions
-camera.position.set(0, 3, 40);
-cameraTarget.set(0, 1.25, 5);
+// Generate a procedural technical grid texture map for the planet
+const pCanvas = document.createElement('canvas');
+pCanvas.width = 512;
+pCanvas.height = 512;
+const pCtx = pCanvas.getContext('2d');
+pCtx.fillStyle = '#060810';
+pCtx.fillRect(0, 0, 512, 512);
+pCtx.strokeStyle = 'rgba(0, 243, 255, 0.45)';
+pCtx.lineWidth = 1;
+// Draw coordinate grid bands
+for (let i = 0; i <= 512; i += 32) {
+    pCtx.beginPath();
+    pCtx.moveTo(i, 0); pCtx.lineTo(i, 512);
+    pCtx.stroke();
+    pCtx.beginPath();
+    pCtx.moveTo(0, i); pCtx.lineTo(512, i);
+    pCtx.stroke();
+}
+const gridTexture = new THREE.CanvasTexture(pCanvas);
 
-// Create timeline scrub bound directly to viewport scroll
+// Planet core mesh
+const planetGeom = new THREE.SphereGeometry(2.5, 64, 64);
+const planetMat = new THREE.MeshStandardMaterial({
+    map: gridTexture,
+    roughness: 0.25,
+    metalness: 0.8,
+    emissive: 0x00f3ff,
+    emissiveMap: gridTexture,
+    emissiveIntensity: 0.12
+});
+const planetMesh = new THREE.Mesh(planetGeom, planetMat);
+planetGroup.add(planetMesh);
+
+// Saturn Ring planes
+const ringGeom = new THREE.RingGeometry(3.3, 6.8, 64);
+// Rotate Ring horizontal
+ringGeom.rotateX(Math.PI / 2);
+
+// Generate procedural ring concentric gradient texture
+const rCanvas = document.createElement('canvas');
+rCanvas.width = 512;
+rCanvas.height = 8;
+const rCtx = rCanvas.getContext('2d');
+const ringGradient = rCtx.createLinearGradient(0, 0, 512, 0);
+ringGradient.addColorStop(0, 'rgba(0, 243, 255, 0.55)');
+ringGradient.addColorStop(0.18, 'rgba(0, 243, 255, 0.08)');
+ringGradient.addColorStop(0.35, 'rgba(255, 0, 255, 0.55)');
+ringGradient.addColorStop(0.48, 'rgba(255, 0, 255, 0.12)');
+ringGradient.addColorStop(0.68, 'rgba(234, 179, 8, 0.65)');
+ringGradient.addColorStop(0.8, 'rgba(234, 179, 8, 0.15)');
+ringGradient.addColorStop(0.92, 'rgba(0, 243, 255, 0.4)');
+ringGradient.addColorStop(1.0, 'rgba(0, 243, 255, 0)');
+rCtx.fillStyle = ringGradient;
+rCtx.fillRect(0, 0, 512, 8);
+const ringTexture = new THREE.CanvasTexture(rCanvas);
+
+const ringMat = new THREE.MeshBasicMaterial({
+    map: ringTexture,
+    transparent: true,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending
+});
+const ringMesh = new THREE.Mesh(ringGeom, ringMat);
+planetGroup.add(ringMesh);
+
+// Apply Saturn's axis tilt (26.73 degrees = 0.466 rad)
+planetGroup.rotation.x = 0.35;
+planetGroup.rotation.z = 0.12;
+scene.add(planetGroup);
+
+// ── Orbiting Moons / Satellites ──────────────────────────────────────────────
+const moons = [];
+const moonColors = [0x00f3ff, 0xff00ff, 0xeab308];
+const moonRadii = [4.5, 5.8, 7.8];
+const moonSpeeds = [0.8, 0.5, 0.3];
+const moonSizes = [0.08, 0.12, 0.06];
+
+for (let i = 0; i < 3; i++) {
+    const moonGeom = new THREE.SphereGeometry(moonSizes[i], 16, 16);
+    const moonMat = new THREE.MeshBasicMaterial({
+        color: moonColors[i],
+        transparent: true,
+        opacity: 0.9
+    });
+    const moonMesh = new THREE.Mesh(moonGeom, moonMat);
+    scene.add(moonMesh);
+    moons.push({
+        mesh: moonMesh,
+        radius: moonRadii[i],
+        speed: moonSpeeds[i],
+        angle: Math.random() * Math.PI * 2
+    });
+}
+
+// ── GSAP ScrollTrigger Camera Flight Mapping ──────────────────────────────────
+// Initial camera placement
+camera.position.set(0, 0, 9.5);
+cameraTarget.set(0, 0, 0);
+
 const scrollTimeline = gsap.timeline({
     scrollTrigger: {
         trigger: 'body',
         start: 'top top',
         end: 'bottom bottom',
-        scrub: 1.8, // Slightly higher scrub lag for smoother float transitions
+        scrub: 1.5, // Smooth lag multiplier
     }
 });
 
-// Animate camera position and target through the matrix (Z-axis flight path)
+// Coordinate mappings:
+// Slide 1 (Hero): Camera (0, 0, 9.5) looking at (0, 0, 0)
+// Slide 2 (Related Work): Camera (-4.2, 0.4, 7.8) looking at (1.5, 0, -1) (Planet shifts to right side)
+// Slide 3 (Methodology): Camera (-2.8, 2.0, 5.6) looking at (1.6, -0.4, -2) (Dramatic rings angle)
+// Slide 4 (Conclusion): Camera (0, 0, 11.5) looking at (0, 0, 0) (Planet retreats centered)
+
 scrollTimeline
-    // Phase 1 (Hero to Radiance)
-    .to(camera.position, { x: 4.5, y: 1.8, z: 15, ease: 'power1.inOut' }, 0)
-    .to(cameraTarget, { x: -2.5, y: 0.6, z: -15, ease: 'power1.inOut' }, 0)
+    // ── Phase 1: Slide 1 -> Slide 2
+    .to(camera.position, { x: -4.2, y: 0.4, z: 7.8, ease: 'power1.inOut' }, 0)
+    .to(cameraTarget, { x: 1.5, y: 0, z: -1, ease: 'power1.inOut' }, 0)
+    .to(planetGroup.rotation, { y: Math.PI * 0.45, ease: 'power1.inOut' }, 0)
+    .to(cyanLight, { intensity: 1, ease: 'power1.inOut' }, 0)
+    .to(magentaLight, { intensity: 7, ease: 'power1.inOut' }, 0)
     
-    // Phase 2 (Radiance to Semantic)
-    .to(camera.position, { x: -5.5, y: 2.8, z: -20, ease: 'power1.inOut' }, 1)
-    .to(cameraTarget, { x: 3, y: 0.9, z: -55, ease: 'power1.inOut' }, 1)
+    // ── Phase 2: Slide 2 -> Slide 3
+    .to(camera.position, { x: -2.8, y: 2.0, z: 5.6, ease: 'power1.inOut' }, 1)
+    .to(cameraTarget, { x: 1.6, y: -0.4, z: -2, ease: 'power1.inOut' }, 1)
+    .to(planetGroup.rotation, { y: Math.PI * 0.9, x: 0.52, ease: 'power1.inOut' }, 1)
+    .to(magentaLight, { intensity: 1, ease: 'power1.inOut' }, 1)
+    .to(yellowLight, { intensity: 7, ease: 'power1.inOut' }, 1)
     
-    // Phase 3 (Semantic to Gaussian)
-    .to(camera.position, { x: 0, y: 0.15, z: -70, ease: 'power1.inOut' }, 2)
-    .to(cameraTarget, { x: 0, y: 0.75, z: -105, ease: 'power1.inOut' }, 2)
-    
-    // Phase 4 (Gaussian to Methodology)
-    .to(camera.position, { x: 0, y: 2.8, z: -115, ease: 'power1.inOut' }, 3)
-    .to(cameraTarget, { x: 0, y: 1.25, z: -170, ease: 'power1.inOut' }, 3);
+    // ── Phase 3: Slide 3 -> Slide 4
+    .to(camera.position, { x: 0, y: 0, z: 11.5, ease: 'power1.inOut' }, 2)
+    .to(cameraTarget, { x: 0, y: 0, z: 0, ease: 'power1.inOut' }, 2)
+    .to(planetGroup.rotation, { y: Math.PI * 1.4, x: 0.35, ease: 'power1.inOut' }, 2)
+    .to(yellowLight, { intensity: 1, ease: 'power1.inOut' }, 2)
+    .to(cyanLight, { intensity: 6, ease: 'power1.inOut' }, 2);
 
-// BACKGROUND SCROLL COLLABORATION: Make environment react dynamically to scroll!
-scrollTimeline
-    // 1. Twist the wireframe tunnel gates based on scroll progress
-    .to(tunnelGroup.rotation, { z: Math.PI * 1.5, ease: 'none' }, 0)
-    
-    // 2. Morph the particle swarm scale (breathing warp effect)
-    .to(particleSystem.scale, { x: 1.25, y: 1.25, z: 0.8, ease: 'power1.inOut' }, 0)
-    .to(particleSystem.scale, { x: 0.75, y: 0.75, z: 1.25, ease: 'power1.inOut' }, 1.5)
-    .to(particleSystem.scale, { x: 1.0, y: 1.0, z: 1.0, ease: 'power1.inOut' }, 3)
-    
-    // 3. Move point lights alongside Z-axis path to stay with the camera
-    .to(cyanLight.position, { z: -100, ease: 'none' }, 0)
-    .to(magentaLight.position, { z: -110, ease: 'none' }, 0)
-    .to(yellowLight.position, { z: -130, ease: 'none' }, 0)
-    
-    // 4. Animate light intensity peaks to light up active sections
-    .to(cyanLight, { intensity: 10, ease: 'power1.inOut' }, 0.5)
-    .to(cyanLight, { intensity: 4, ease: 'power1.inOut' }, 2.0)
-    .to(magentaLight, { intensity: 10, ease: 'power1.inOut' }, 1.5)
-    .to(magentaLight, { intensity: 4, ease: 'power1.inOut' }, 3.0)
-
-    // 5. Morph Fog parameters & Color signatures dynamically
-    .to(scene.fog.color, { r: 0.005, g: 0.065, b: 0.095, ease: 'power1.inOut' }, 0.5) // Cyan zone
-    .to(scene.fog.color, { r: 0.08, g: 0.005, b: 0.095, ease: 'power1.inOut' }, 1.5)  // Magenta zone
-    .to(scene.fog.color, { r: 0.095, g: 0.085, b: 0.005, ease: 'power1.inOut' }, 2.5) // Yellow zone
-    .to(scene.fog.color, { r: 0.008, g: 0.008, b: 0.016, ease: 'power1.inOut' }, 3.5) // Reset dark
-    
-    .to(scene.fog, { density: 0.024, ease: 'power1.inOut' }, 0.5)
-    .to(scene.fog, { density: 0.012, ease: 'power1.inOut' }, 2.0);
-
-// ── Content Panels Fade In/Out on Scroll ──────────────────────────────────────
-const sections = document.querySelectorAll('section');
-sections.forEach((section) => {
-    const card = section.querySelector('div');
-    if (card) {
-        // Fade in card as it reaches center of the screen
-        gsap.fromTo(card,
-            { opacity: 0.05, y: 60, scale: 0.95 },
-            {
-                opacity: 1,
-                y: 0,
-                scale: 1,
-                scrollTrigger: {
-                    trigger: section,
-                    start: 'top 80%',
-                    end: 'top 35%',
-                    scrub: true,
-                }
-            }
-        );
-        
-        // Fade out card as it scrolls away
-        gsap.to(card, {
-            opacity: 0.05,
-            y: -60,
-            scale: 0.95,
-            scrollTrigger: {
-                trigger: section,
-                start: 'bottom 65%',
-                end: 'bottom 20%',
-                scrub: true,
-            }
-        });
-    }
-});
-
-// Update Scroll Progress bar width based on scroll percentage
+// Update Scroll Progress bar
 window.addEventListener('scroll', () => {
     const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
     if (scrollHeight > 0) {
@@ -286,6 +259,251 @@ window.addEventListener('scroll', () => {
     }
 });
 
+// ── Interactive UI Logic ─────────────────────────────────────────────────────
+
+// Math blueprints database extracted from related-work.tex
+const formulasData = [
+    {
+        title: "Volume Rendering integration",
+        eq1: "\\mathcal{C}(r)=\\int_{t_{n}}^{t_{f}}T(t)\\sigma(r(t))c(r(t),d)d~t",
+        eq2: "T(t) = \\exp\\left( - \\int_{t_n}^{t} \\sigma(r(s)) ds \\right)",
+        desc: "Models physical environments as continuous 5D fields. The predicted optical color payload is calculated by integrating differential density opacities along the tracer camera ray.",
+        fig: "/img/1.png",
+        caption: "Figure 2: Neural Radiance Field Scene Representation"
+    },
+    {
+        title: "PSNR & SSIM Diagnostics",
+        eq1: "PSNR(I)=10\\cdot \\log_{10}\\left(\\frac{MAX(I)^{2}}{MSE(I)}\\right)",
+        eq2: "SSIM(x, y) = \\frac{(2\\mu_x\\mu_y + C_1)(2\\sigma_{xy} + C_2)}{(\\mu_x^2 + \\mu_y^2 + C_1)(\\sigma_x^2 + \\sigma_y^2 + C_2)}",
+        desc: "Quality assessment standards to evaluate synthetic views. PSNR checks pixel-wise mean squared errors, while SSIM audits structural luminance and covariance similarity grids.",
+        fig: "/img/6.png",
+        caption: "Figure 5: Evaluation Bias"
+    },
+    {
+        title: "Semantic Consistency",
+        eq1: "\\mathcal{H}_{SC,l_{2}}(I,\\hat{I})=\\frac{\\lambda}{2}||\\phi(I)-\\phi(\\hat{I})||_{2}^{2}",
+        eq2: "",
+        desc: "Prevents geometry collapse in sparse training zones (e.g. DietNeRF). Compares semantic features extracted by vision transformers (CLIP ViT) from varied viewpoints.",
+        fig: "/img/3.png",
+        caption: "Figure 3: Novel Visual Feeds from solitary input"
+    },
+    {
+        title: "Score Distillation & Density",
+        eq1: "\\nabla_{\\Theta}\\mathcal{L}_{SDS} = \\mathbb{E}_{t,p,\\epsilon}[w(t)(\\epsilon_{\\phi}(I_{RGB}^{p};t,\\epsilon)-\\epsilon)\\frac{\\partial I_{RGB}^{p}}{\\partial\\Theta}]",
+        eq2: "d(x)=\\sum_{i}\\alpha_{i}exp(-\\frac{1}{2}(x-x_{i})^{T}\\Sigma_{i}^{-1}(x-x_{i}))",
+        desc: "Orchestrates text-to-3D generations (e.g. DreamGaussian). Guides Gaussian ellipsoids using 2D diffusion priors, and calculates volumetric density at arbitrary nodes.",
+        fig: "/img/7.png",
+        caption: "Figure 7: Comparisons on Image-to-3D"
+    },
+    {
+        title: "Temporal Kinematics",
+        eq1: "\\mathcal{L}_{rot} = \\frac{1}{K} \\sum \\sum w_{ij} ||q - q||^2",
+        eq2: "",
+        desc: "Regularizes spatial drift in dynamic time-steps. Imposes rotational constraints on quaternions between neighboring nodes to stabilize physics in the volumetric sequence.",
+        fig: "/img/11.png",
+        caption: "Figure 11: Vectra Protocol Decoupled Architecture"
+    }
+];
+
+function selectFormula(index) {
+    const formula = formulasData[index];
+    if (!formula) return;
+
+    // Toggle active classes on tab elements
+    for (let i = 0; i < formulasData.length; i++) {
+        const tab = document.getElementById(`f-tab-${i}`);
+        if (tab) {
+            if (i === index) tab.classList.add('active');
+            else tab.classList.remove('active');
+        }
+    }
+
+    const container = document.getElementById('formula-detail-pane');
+    const figContainer = document.getElementById('formula-fig-container');
+    const figImg = document.getElementById('formula-fig');
+    const figCap = document.getElementById('formula-fig-caption');
+
+    if (!container || !figImg || !figCap || !figContainer) return;
+
+    // Smooth transition: fade out, update, fade in
+    gsap.to([container, figContainer], {
+        opacity: 0.05,
+        duration: 0.2,
+        onComplete: () => {
+            // Clear old elements safely
+            container.replaceChildren();
+
+            // Append Title
+            const titleNode = document.createElement('h3');
+            titleNode.className = 'font-mono text-sm text-cyan-400 font-bold uppercase mb-2 tracking-widest text-glow-cyan';
+            titleNode.textContent = formula.title;
+            container.appendChild(titleNode);
+
+            // Append Description
+            const descNode = document.createElement('p');
+            descNode.className = 'leading-relaxed text-neutral-300 text-xs md:text-sm mb-4 font-sans';
+            descNode.textContent = formula.desc;
+            container.appendChild(descNode);
+
+            // Append Formula 1
+            const mathBlock1 = document.createElement('div');
+            mathBlock1.className = 'my-4 p-3 rounded-lg bg-black/45 border border-cyan-900/10 text-center';
+            katex.render(formula.eq1, mathBlock1, { displayMode: true, throwOnError: false });
+            container.appendChild(mathBlock1);
+
+            // Append Formula 2 (if exists)
+            if (formula.eq2) {
+                const mathBlock2 = document.createElement('div');
+                mathBlock2.className = 'my-4 p-3 rounded-lg bg-black/45 border border-cyan-900/10 text-center';
+                katex.render(formula.eq2, mathBlock2, { displayMode: true, throwOnError: false });
+                container.appendChild(mathBlock2);
+            }
+
+            // Update Image
+            figImg.setAttribute('src', formula.fig);
+            figCap.textContent = formula.caption;
+
+            // Fade back in
+            gsap.to([container, figContainer], { opacity: 1, duration: 0.3 });
+        }
+    });
+}
+
+// Scenarios Database extracted from method.tex and appendix.tex
+const scenariosData = {
+    extract: {
+        text: "<strong>Scenario 1 (Generative Extraction Protocol)</strong> handles spatial culling and segmentation. Drawing a 2D viewport bounds frustum projects Z-buffer depths to isolate the selected volume. U2Net segments the object, solid white alpha flattening purges boundary gradients, and TripoSR constructs the mesh. Shader-level <strong>Deep Splat Excavation (DBSE)</strong> wipes opacity values to punch a hole in the dense PLY point cloud, spawning the dynamic GLB collider box at its centroid without clipping.",
+        nodes: ['node-input', 'node-segment', 'node-forge', 'node-dbse', 'node-inject'],
+        paths: ['flow-path-1', 'flow-path-2', 'flow-path-3', 'flow-path-4', 'flow-path-5'],
+        legend: "Interactive telemetry: Captures 2D viewport coordinates -> Segments silhouette mask -> Generates mesh via TripoSR -> Shader overrides opacity values via DBSE -> Injects GLB mesh with rigidbody physics."
+    },
+    create: {
+        text: "<strong>Scenario 2 (Local Summoning Engine)</strong> maps semantic text prompts directly to meshes on tight GPU parameters (8GB VRAM RTX 4060). SDXL-Lightning loads first to generate a half-precision (float16) 2D pixel canvas. Critically, to prevent VRAM allocation overflows, the SDXL memory cache is aggressively purged (<code>torch.cuda.empty_cache()</code>) before TripoSR boots into memory to run the Marching Cubes volumetric forge.",
+        nodes: ['node-input', 'node-forge', 'node-inject'],
+        paths: ['flow-path-1', 'flow-path-2'], // highlights path bypassing Segment/DBSE
+        legend: "Interactive telemetry: Parses text prompt -> SDXL-Lightning image generation -> Aggressive memory cache flush -> TripoSR volumetric forging -> Injects GLB mesh directly to physics terminal."
+    }
+};
+
+const pipelineNodeInfo = {
+    'node-input': "INPUT SOURCE: Captures viewport bounding coordinates or textual descriptors.",
+    'node-segment': "U2NET SEGMENTER: Segments silhouette, flattens alpha to avoid blob artifacts.",
+    'node-forge': "TRIPOSR INFRASTRUCTURE: Projects 2D pixels to triplane grids, decodes mesh.",
+    'node-dbse': "DBSE MASKING: Surgically sets opacity to zero in shader, avoiding visual clipping.",
+    'node-inject': "GLB INJECTION: Binds lightweight meshes to Cannon.js physics rigidbodies."
+};
+
+function selectScenario(key) {
+    const data = scenariosData[key];
+    if (!data) return;
+
+    // Toggle button active classes
+    const btnExtract = document.getElementById('scen-btn-extract');
+    const btnCreate = document.getElementById('scen-btn-create');
+    if (key === 'extract') {
+        btnExtract.classList.add('active');
+        btnCreate.classList.remove('active');
+    } else {
+        btnCreate.classList.add('active');
+        btnExtract.classList.remove('active');
+    }
+
+    const detailText = document.getElementById('scenario-detail');
+    if (detailText) {
+        detailText.innerHTML = data.text;
+    }
+
+    const legendText = document.getElementById('flow-node-details');
+    if (legendText) {
+        legendText.textContent = data.legend;
+    }
+
+    // Highlight flowchart nodes
+    const allNodes = ['node-input', 'node-segment', 'node-forge', 'node-dbse', 'node-inject'];
+    allNodes.forEach(nodeId => {
+        const el = document.getElementById(nodeId);
+        if (el) {
+            const rect = el.querySelector('rect');
+            if (data.nodes.includes(nodeId)) {
+                rect.setAttribute('stroke-opacity', '1');
+                rect.setAttribute('fill-opacity', '0.15');
+                rect.setAttribute('stroke-width', '1.5');
+            } else {
+                rect.setAttribute('stroke-opacity', '0.25');
+                rect.setAttribute('fill-opacity', '0.02');
+                rect.setAttribute('stroke-width', '1');
+            }
+        }
+    });
+
+    // Highlight SVG paths
+    const allPaths = ['flow-path-1', 'flow-path-2', 'flow-path-3', 'flow-path-4', 'flow-path-5'];
+    allPaths.forEach(pathId => {
+        const pathEl = document.getElementById(pathId);
+        if (pathEl) {
+            if (data.paths.includes(pathId)) {
+                pathEl.setAttribute('stroke-opacity', '1');
+                pathEl.setAttribute('stroke-width', '1.5');
+                pathEl.classList.add('flow-line');
+            } else {
+                pathEl.setAttribute('stroke-opacity', '0.15');
+                pathEl.setAttribute('stroke-width', '1');
+                pathEl.classList.remove('flow-line');
+            }
+        }
+    });
+}
+
+function scrollToSection(selector) {
+    gsap.to(window, {
+        duration: 0.85,
+        scrollTo: selector,
+        ease: 'power2.inOut'
+    });
+}
+
+// Bind interactive event listeners for flowchart nodes
+function initFlowchartEvents() {
+    const allNodes = ['node-input', 'node-segment', 'node-forge', 'node-dbse', 'node-inject'];
+    const legendText = document.getElementById('flow-node-details');
+
+    allNodes.forEach(nodeId => {
+        const nodeEl = document.getElementById(nodeId);
+        if (nodeEl) {
+            nodeEl.addEventListener('mouseenter', () => {
+                const info = pipelineNodeInfo[nodeId];
+                if (legendText && info) {
+                    legendText.textContent = info;
+                    legendText.style.color = "#00f3ff";
+                }
+            });
+            nodeEl.addEventListener('mouseleave', () => {
+                if (legendText) {
+                    legendText.style.color = "";
+                    // Restore current active scenario default description
+                    const activeBtn = document.querySelector('.px-3.py-1.5.rounded.border.active');
+                    if (activeBtn) {
+                        const key = activeBtn.id === 'scen-btn-extract' ? 'extract' : 'create';
+                        legendText.textContent = scenariosData[key].legend;
+                    }
+                }
+            });
+        }
+    });
+}
+
+// Expose selection functions to global window namespace
+window.selectFormula = selectFormula;
+window.selectScenario = selectScenario;
+window.scrollToSection = scrollToSection;
+
+// On load initialization
+document.addEventListener('DOMContentLoaded', () => {
+    selectFormula(0);
+    selectScenario('extract');
+    initFlowchartEvents();
+});
+
 // ── Animation Loop ──────────────────────────────────────────────────────────
 const clock = new THREE.Clock();
 
@@ -294,21 +512,30 @@ function animate() {
 
     const time = clock.getElapsedTime();
 
-    // 1. Constant minor background drift (prevents visual staticness when scroll stops)
-    particleSystem.rotation.z = time * 0.006;
-    particleSystem.rotation.x = Math.sin(time * 0.02) * 0.015;
+    // 1. Planet self-rotation (constant spin)
+    planetMesh.rotation.y = time * 0.04;
 
-    // 2. Continuous floating light orbits
-    cyanLight.position.x += Math.sin(time * 1.2) * 0.05;
-    cyanLight.position.y += Math.cos(time * 0.9) * 0.03;
-    
-    magentaLight.position.x += Math.cos(time * 1.2) * 0.05;
-    magentaLight.position.y += Math.sin(time * 0.9) * 0.03;
+    // 2. Animate satellite moon orbits around planet
+    moons.forEach((moon) => {
+        moon.angle += moon.speed * clock.getDelta();
+        const x = Math.cos(moon.angle) * moon.radius;
+        const z = Math.sin(moon.angle) * moon.radius;
+        
+        // Match the planet group tilt in coordinate space
+        const pos = new THREE.Vector3(x, 0, z);
+        pos.applyAxisAngle(new THREE.Vector3(1, 0, 0), 0.35); // matches x rotation
+        pos.applyAxisAngle(new THREE.Vector3(0, 0, 1), 0.12); // matches z rotation
+        
+        moon.mesh.position.copy(pos);
+    });
 
-    // 3. Force camera lookAt coordinate focus
+    // 3. Constant minor background starfield drift
+    starfield.rotation.y = time * 0.001;
+
+    // 4. Force camera lookAt alignment
     camera.lookAt(cameraTarget);
 
-    // 4. Render
+    // 5. Render
     renderer.render(scene, camera);
 }
 
