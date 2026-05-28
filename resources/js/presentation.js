@@ -178,67 +178,113 @@ scene.add(stardust);
 // ── Procedural Saturn Planet Core & Ring System ─────────────────────────────
 const planetGroup = new THREE.Group();
 
-// 1. Saturn Body: Create procedural linear band gradient texture
+// 1. Saturn Body: Create high-resolution procedural texture based on the reference image
 const pCanvas = document.createElement('canvas');
-pCanvas.width = 512;
-pCanvas.height = 256;
+pCanvas.width = 1024;
+pCanvas.height = 512;
 const pCtx = pCanvas.getContext('2d');
-const saturnGradient = pCtx.createLinearGradient(0, 0, 0, 256);
-saturnGradient.addColorStop(0, '#3e3124');   // North pole dark brown
-saturnGradient.addColorStop(0.15, '#7b6855'); // Brown-gray transition band
-saturnGradient.addColorStop(0.3, '#c9b79c');  // Creamy bright ocher band
-saturnGradient.addColorStop(0.45, '#a48e71'); // Mid-latitude tan band
-saturnGradient.addColorStop(0.52, '#6f563d'); // Dark ring-shadow style band
-saturnGradient.addColorStop(0.65, '#c5b497'); // South temperate cream band
-saturnGradient.addColorStop(0.8, '#9c8365');  // Warm brown band
-saturnGradient.addColorStop(1.0, '#32261b');   // South pole dark brown
-pCtx.fillStyle = saturnGradient;
-pCtx.fillRect(0, 0, 512, 256);
 
-// Inject random micro-bands for gaseous atmospheric texture
-for (let y = 0; y < 256; y += 3) {
-    pCtx.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.04})`;
-    pCtx.fillRect(0, y, 512, 1 + Math.random() * 2);
-    pCtx.fillStyle = `rgba(0, 0, 0, ${Math.random() * 0.04})`;
-    pCtx.fillRect(0, y, 512, 1 + Math.random() * 2);
+// Paint linear band gradient of Saturn colors
+const saturnGradient = pCtx.createLinearGradient(0, 0, 0, 512);
+saturnGradient.addColorStop(0.0, '#3a4754');  // Dark blue-gray north pole cap
+saturnGradient.addColorStop(0.12, '#8199ad'); // Muted blue-gray belt
+saturnGradient.addColorStop(0.24, '#c1c5cc'); // Silvery white band
+saturnGradient.addColorStop(0.35, '#d09b52'); // Light golden orange
+saturnGradient.addColorStop(0.42, '#9d581a'); // Dark copper orange
+saturnGradient.addColorStop(0.48, '#dfb47a'); // Bright cream ocher belt
+saturnGradient.addColorStop(0.55, '#67401a'); // Dark brown shadow-like band
+saturnGradient.addColorStop(0.68, '#c9bca1'); // Beige-gray band
+saturnGradient.addColorStop(0.82, '#a59178'); // Warm brown-tan belt
+saturnGradient.addColorStop(1.0, '#372d23');  // Dark brown south pole
+pCtx.fillStyle = saturnGradient;
+pCtx.fillRect(0, 0, 1024, 512);
+
+// Inject fine horizontal stripes for gas giant surface texture
+for (let y = 0; y < 512; y += 4) {
+    pCtx.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.08})`;
+    pCtx.fillRect(0, y, 1024, 1 + Math.random() * 2);
+    pCtx.fillStyle = `rgba(0, 0, 0, ${Math.random() * 0.08})`;
+    pCtx.fillRect(0, y, 1024, 1 + Math.random() * 2);
+}
+
+// Draw swirling white storms and clouds wrapping seamlessly
+pCtx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+for (let i = 0; i < 45; i++) {
+    const x = Math.random() * 1024;
+    const y = 80 + Math.random() * 340;
+    const sizeW = 15 + Math.random() * 65;
+    const sizeH = 2 + Math.random() * 6;
+    
+    pCtx.beginPath();
+    pCtx.ellipse(x, y, sizeW, sizeH, (Math.random() - 0.5) * 0.1, 0, 2 * Math.PI);
+    pCtx.fill();
+    
+    if (x + sizeW > 1024) {
+        pCtx.beginPath();
+        pCtx.ellipse(x - 1024, y, sizeW, sizeH, (Math.random() - 0.5) * 0.1, 0, 2 * Math.PI);
+        pCtx.fill();
+    }
+    if (x - sizeW < 0) {
+        pCtx.beginPath();
+        pCtx.ellipse(x + 1024, y, sizeW, sizeH, (Math.random() - 0.5) * 0.1, 0, 2 * Math.PI);
+        pCtx.fill();
+    }
 }
 const saturnTexture = new THREE.CanvasTexture(pCanvas);
 
 const outerGeom = new THREE.SphereGeometry(2.5, 64, 64);
-const outerMat = new THREE.MeshStandardMaterial({
-    map: saturnTexture,
-    roughness: 0.82,
-    metalness: 0.1,
-    emissive: 0x110b06 // subtle dark glow to preserve visibility on shadow side
+const outerMat = new THREE.MeshBasicMaterial({
+    map: saturnTexture
 });
 const outerPlanet = new THREE.Mesh(outerGeom, outerMat);
 planetGroup.add(outerPlanet);
 
-// 2. Saturn concentric rings with divisions (Cassini / Encke style)
+// 2. Saturn concentric rings with divisions (A, B, C rings and Cassini gap)
 const ringGeom = new THREE.RingGeometry(3.3, 7.8, 64);
 ringGeom.rotateX(Math.PI / 2);
 
 const rCanvas = document.createElement('canvas');
-rCanvas.width = 512;
-rCanvas.height = 512;
+rCanvas.width = 1024;
+rCanvas.height = 1024;
 const rCtx = rCanvas.getContext('2d');
-rCtx.clearRect(0, 0, 512, 512);
+rCtx.clearRect(0, 0, 1024, 1024);
 
-// Draw concentric rings from center coordinate (256, 256)
-const centerX = 256;
-const centerY = 256;
-for (let r = 100; r < 250; r += 1) {
-    const opacity = 0.18 + 0.65 * (0.5 + 0.5 * Math.sin(r * 0.35)) * (r > 115 && r < 235 ? 1 : 0.15);
+const centerX = 512;
+const centerY = 512;
+
+// Draw concentric rings from center coordinate (512, 512)
+// Radius in canvas goes from 210 (inner) to 500 (outer) to match RingGeometry ratio
+for (let r = 210; r < 500; r += 1) {
+    let opacity = 0.85;
+    let color = 'rgba(215, 198, 172, '; // default golden cream
     
-    let color = 'rgba(215, 198, 172, '; // creamy ocher dust
-    if (r % 16 < 3) color = 'rgba(120, 105, 90, '; // dark Cassini gap division
-    else if (r % 26 < 4) color = 'rgba(175, 162, 145, '; // gray-silver band
-    else if (r > 205) color = 'rgba(235, 222, 202, '; // bright outer A-ring
+    if (r < 250) {
+        // C-ring: inner, darker grey-blue, semi-translucent
+        color = 'rgba(110, 125, 140, ';
+        opacity = 0.25 + 0.25 * Math.sin(r * 0.1);
+    } else if (r >= 250 && r < 410) {
+        // B-ring: middle, bright cream-gold and white, very opaque
+        if (r % 12 < 4) color = 'rgba(245, 235, 215, '; // white band
+        else color = 'rgba(215, 190, 155, '; // gold band
+        opacity = 0.75 + 0.2 * Math.sin(r * 0.08);
+    } else if (r >= 410 && r < 430) {
+        // Cassini Division: dark gap
+        color = 'rgba(60, 50, 40, ';
+        opacity = 0.06;
+    } else {
+        // A-ring: outer, light gray-tan
+        if (r % 15 < 3) color = 'rgba(150, 135, 120, '; // dusty division
+        else color = 'rgba(195, 180, 160, '; // tan band
+        opacity = 0.55 + 0.15 * Math.sin(r * 0.05);
+    }
+    
+    // Add micro-shadow lines for fine ring details
+    opacity *= (0.8 + 0.2 * Math.sin(r * 1.5));
     
     rCtx.beginPath();
     rCtx.arc(centerX, centerY, r, 0, 2 * Math.PI);
     rCtx.strokeStyle = color + opacity + ')';
-    rCtx.lineWidth = 1.5;
+    rCtx.lineWidth = 1.8;
     rCtx.stroke();
 }
 const ringTexture = new THREE.CanvasTexture(rCanvas);
