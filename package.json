@@ -20,6 +20,7 @@
     "dependencies": {
         "@mkkellogg/gaussian-splats-3d": "^0.4.7",
         "axios": "^1.16.1",
+        "gsap": "^3.15.0",
         "three": "^0.184.0"
     }
 }
