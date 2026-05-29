@@ -6,6 +6,152 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 
 console.log('%c[VECTRA PORTAL] Initializing Cyberpunk City Engine...', 'color: #00f3ff; font-weight: bold;');
 
+// ── Procedural Web Audio API Sound Synth ────────────────────────────────────
+class CyberSynth {
+    constructor() {
+        this.ctx = null;
+    }
+
+    init() {
+        if (!this.ctx) {
+            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+    }
+
+    playAlert() {
+        this.init();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const filter = this.ctx.createBiquadFilter();
+
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(580, now);
+        osc.frequency.setValueAtTime(880, now + 0.08);
+
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(1100, now);
+
+        gain.gain.setValueAtTime(0.04, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.3);
+    }
+
+    playTick() {
+        this.init();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(900 + Math.random() * 500, now);
+
+        gain.gain.setValueAtTime(0.012, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.015);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.02);
+    }
+
+    playGlitch() {
+        this.init();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+
+        const bufferSize = this.ctx.sampleRate * 0.12;
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+        }
+
+        const source = this.ctx.createBufferSource();
+        source.buffer = buffer;
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1200, now);
+        filter.Q.setValueAtTime(6, now);
+
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.035, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+
+        source.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        source.start(now);
+        source.stop(now + 0.12);
+    }
+
+    playReveal() {
+        this.init();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc1 = this.ctx.createOscillator();
+        const osc2 = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc1.type = 'triangle';
+        osc2.type = 'sine';
+
+        osc1.frequency.setValueAtTime(180, now);
+        osc1.frequency.exponentialRampToValueAtTime(540, now + 0.35);
+
+        osc2.frequency.setValueAtTime(183, now);
+        osc2.frequency.exponentialRampToValueAtTime(543, now + 0.35);
+
+        gain.gain.setValueAtTime(0.06, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc1.start(now);
+        osc2.start(now);
+
+        osc1.stop(now + 0.45);
+        osc2.stop(now + 0.45);
+    }
+
+    playHover() {
+        this.init();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1400, now);
+        osc.frequency.setValueAtTime(1800, now + 0.015);
+
+        gain.gain.setValueAtTime(0.02, now);
+        gain.gain.setValueAtTime(0.02, now + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.06);
+    }
+}
+
+const sfx = new CyberSynth();
+
 // Define variables globally so animate and resize can access them
 let scene, camera, renderer, composer, cameraTarget;
 let carMesh, carsData, carCount;
@@ -256,7 +402,7 @@ function animate() {
     }
 }
 
-// Helper for terminal-style typing effect
+// Helper for terminal-style typing effect with ticking sound
 function typeText(element, text, speed) {
     return new Promise((resolve) => {
         let i = 0;
@@ -264,6 +410,7 @@ function typeText(element, text, speed) {
         function nextChar() {
             if (i < text.length) {
                 element.innerHTML += text.charAt(i);
+                sfx.playTick(); // Play typing click sound
                 i++;
                 setTimeout(nextChar, speed);
             } else {
@@ -295,6 +442,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 1. Boot Toast Entrance (Glitchy slide in)
     const tl = gsap.timeline({
+        onStart: () => sfx.playAlert(), // Play warning tone on slide-in
         onComplete: startBootTyping
     });
 
@@ -311,6 +459,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function exitBootToast() {
+        sfx.playGlitch(); // Play static glitch SFX
+
         const exitTl = gsap.timeline({
             onComplete: () => {
                 bootToast.style.display = 'none';
@@ -325,6 +475,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function revealMainUI() {
+        sfx.playReveal(); // Play futuristic hum SFX
+
         gsap.to(mainPane, {
             opacity: 1,
             scale: 1,
@@ -334,18 +486,24 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Play background audio on first user click
-    const playMusic = () => {
-        const music = document.getElementById('bg-music');
-        if (music && music.paused) {
-            music.play().then(() => {
-                console.log('[AUDIO] Background music started.');
-            }).catch(err => {
-                console.warn('[AUDIO] Playback blocked:', err);
-            });
+    // Attach hover sound effects to all links
+    const links = document.querySelectorAll('.glitch-link');
+    links.forEach(link => {
+        link.addEventListener('mouseenter', () => {
+            sfx.playHover();
+        });
+    });
+
+    // Auto-resume AudioContext on first gesture to fulfill security policies
+    const resumeAudio = () => {
+        sfx.init();
+        if (sfx.ctx && sfx.ctx.state === 'suspended') {
+            sfx.ctx.resume();
         }
     };
-    document.addEventListener('click', playMusic, { once: true });
+    window.addEventListener('click', resumeAudio, { once: true });
+    window.addEventListener('keydown', resumeAudio, { once: true });
+    window.addEventListener('pointerdown', resumeAudio, { once: true });
 });
 
 // ── Window Resize adjustments ────────────────────────────────────────────────
