@@ -261,7 +261,7 @@ async def summon_protocol(req: SummonRequest):
                 local_response = await client.post(
                     f"{local_url}/api/summon",
                     json={"prompt": req.prompt},
-                    timeout=300.0 # High timeout for local SD + TripoSR CPU generation
+                    timeout=600.0 # High timeout for local SD + TripoSR CPU generation
                 )
                 
                 if local_response.status_code != 200:

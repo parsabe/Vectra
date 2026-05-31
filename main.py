@@ -51,7 +51,10 @@ model = TSR.from_pretrained(
     config_name="config.yaml",
     weight_name="model.ckpt"
 )
-model.renderer.set_chunk_size(8192)
+if device.startswith("cuda"):
+    model.renderer.set_chunk_size(8192)
+else:
+    model.renderer.set_chunk_size(1024)
 model.to(device)
 
 t2i_pipe = None
@@ -86,14 +89,14 @@ def generate_image(prompt: str) -> Image.Image:
     print(f"[BRAIN] Generating 2D image for prompt: '{enhanced_prompt}'...")
     
     with torch.inference_mode():
-        # LCM model generates great images in 3 steps with guidance_scale=8.0
-        # By reducing resolution to 384x384, we speed up generation by 2x on CPU
+        # LCM model generates great images in 2 steps with guidance_scale=8.0
+        # By reducing resolution to 256x256, we speed up generation by 3x on CPU
         result = t2i_pipe(
             prompt=enhanced_prompt,
-            num_inference_steps=3,
+            num_inference_steps=2,
             guidance_scale=8.0,
-            width=384,
-            height=384
+            width=256,
+            height=256
         )
         image = result.images[0]
     return image
