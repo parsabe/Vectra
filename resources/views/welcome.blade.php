@@ -294,6 +294,7 @@
             <span class="text-green-800 text-[8px]">A/D – Strafe</span>
             <span class="text-green-800 text-[8px]">Q/E – Up/Down</span>
             <span class="text-green-800 text-[8px]">SHIFT – Sprint</span>
+            <span class="text-green-800 text-[8px]">R-CLICK (HOLD) – Look Around</span>
         </div>
     </div>
 

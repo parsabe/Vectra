@@ -279,8 +279,149 @@ let currentSizeIndex = 1; // Default 0.06
 const markersGroup = new THREE.Group();
 scene.add(markersGroup);
 
-// --- Orbit Controls ---
-const controls = new OrbitControls(camera, renderer.domElement);
+// --- First-Person Noclip Flying Controls ---
+class NoclipFlyingControls {
+    constructor(camera, domElement) {
+        this.camera = camera;
+        this.domElement = domElement;
+        this.enabled = true;
+        
+        // Settings mimicking OrbitControls to satisfy code dependencies
+        this.enableDamping = true;
+        this.dampingFactor = 0.05;
+        this.maxPolarAngle = Math.PI / 2 - 0.05;
+        this.minDistance = 1;
+        this.maxDistance = 50;
+        this.target = new THREE.Vector3(0, 0.5, 0);
+        this.object = camera;
+
+        // Set rotation order to YXZ for FPS style rotation
+        this.camera.rotation.order = 'YXZ';
+
+        // Orientation tracker
+        this.yaw = 0;
+        this.pitch = 0;
+        this.lookSpeed = 0.002;
+        
+        this.isRightMouseDown = false;
+        this.isPointerLocked = false;
+        
+        // Track last external states
+        this.lastTarget = new THREE.Vector3();
+        this.lastPosition = new THREE.Vector3();
+
+        // Bind events
+        this.onMouseDown = this.onMouseDown.bind(this);
+        this.onMouseMove = this.onMouseMove.bind(this);
+        this.onMouseUp = this.onMouseUp.bind(this);
+        this.onContextMenu = this.onContextMenu.bind(this);
+        this.onPointerLockChange = this.onPointerLockChange.bind(this);
+
+        this.domElement.addEventListener('mousedown', this.onMouseDown);
+        window.addEventListener('mousemove', this.onMouseMove);
+        window.addEventListener('mouseup', this.onMouseUp);
+        this.domElement.addEventListener('contextmenu', this.onContextMenu);
+        document.addEventListener('pointerlockchange', this.onPointerLockChange);
+        
+        this.syncFromCamera();
+    }
+
+    syncFromCamera() {
+        const euler = new THREE.Euler().setFromQuaternion(this.camera.quaternion, 'YXZ');
+        this.yaw = euler.y;
+        this.pitch = euler.x;
+    }
+
+    onMouseDown(e) {
+        if (!this.enabled) return;
+        if (e.button === 2) { // Right click
+            this.isRightMouseDown = true;
+            this.syncFromCamera();
+            
+            // Lock pointer for continuous movement and cursor hide
+            try {
+                this.domElement.requestPointerLock();
+            } catch (err) {
+                console.warn('[VECTRA] PointerLock request failed:', err);
+            }
+        }
+    }
+
+    onMouseMove(e) {
+        if (!this.enabled) return;
+        
+        // We only rotate if the right mouse is down OR pointer is locked
+        if (!this.isRightMouseDown && !this.isPointerLocked) return;
+
+        const movementX = e.movementX || e.mozMovementX || e.webkitMovementX || 0;
+        const movementY = e.movementY || e.mozMovementY || e.webkitMovementY || 0;
+
+        this.yaw -= movementX * this.lookSpeed;
+        this.pitch -= movementY * this.lookSpeed;
+
+        // Clamp pitch to prevent flipping (mimic maxPolarAngle and avoid gimbal lock)
+        const limit = Math.min(Math.PI / 2 - 0.01, this.maxPolarAngle !== undefined ? this.maxPolarAngle : (Math.PI / 2 - 0.05));
+        this.pitch = Math.max(-limit, Math.min(limit, this.pitch));
+
+        this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
+    }
+
+    onMouseUp(e) {
+        if (e.button === 2) {
+            this.isRightMouseDown = false;
+            if (document.pointerLockElement === this.domElement) {
+                document.exitPointerLock();
+            }
+        }
+    }
+
+    onContextMenu(e) {
+        if (this.enabled) {
+            e.preventDefault();
+        }
+    }
+
+    onPointerLockChange() {
+        this.isPointerLocked = (document.pointerLockElement === this.domElement);
+    }
+
+    update() {
+        if (!this.enabled) return;
+        
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+        
+        if (this.isRightMouseDown || this.isPointerLocked) {
+            // Actively look around: update target ahead of camera so other code has correct target
+            this.target.copy(this.camera.position).addScaledVector(forward, 2);
+        } else {
+            // Check if target or position was changed externally by the app (e.g. model focus, reset)
+            const toTarget = new THREE.Vector3().subVectors(this.target, this.camera.position).normalize();
+            const dot = forward.dot(toTarget);
+            
+            if (dot < 0.999 && this.target.distanceTo(this.camera.position) > 0.01) {
+                this.camera.lookAt(this.target);
+                this.syncFromCamera();
+            } else {
+                this.target.copy(this.camera.position).addScaledVector(forward, 2);
+            }
+        }
+
+        // Keep track of last frame's position and target
+        this.lastTarget.copy(this.target);
+        this.lastPosition.copy(this.camera.position);
+    }
+
+    dispose() {
+        this.domElement.removeEventListener('mousedown', this.onMouseDown);
+        window.removeEventListener('mousemove', this.onMouseMove);
+        window.removeEventListener('mouseup', this.onMouseUp);
+        this.domElement.removeEventListener('contextmenu', this.onContextMenu);
+        document.removeEventListener('pointerlockchange', this.onPointerLockChange);
+    }
+}
+
+// --- Orbit Controls replaced by First-Person Noclip controls ---
+const controls = new NoclipFlyingControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
 controls.maxPolarAngle = Math.PI / 2 - 0.05; // Lock camera from going below floor level

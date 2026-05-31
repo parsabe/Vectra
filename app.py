@@ -111,15 +111,38 @@ def generate_image(prompt: str) -> Image.Image:
 
 def generate_3d(image: Image.Image):
     print("[BODY] Running background removal...")
-    no_bg_image = remove_background(image, rembg_session=rembg_session, force=True)
+    if image.mode != "RGBA":
+        image = image.convert("RGBA")
     
-    print("[BODY] Resizing foreground...")
-    resized_image = resize_foreground(no_bg_image, 0.85)
+    # Aggressive background removal using rembg session directly
+    no_bg_image = rembg.remove(image, session=rembg_session)
     
-    print("[BODY] Compositing onto solid white background...")
-    # Composite foreground on a solid white background as required
-    white_bg = Image.new("RGBA", resized_image.size, (255, 255, 255, 255))
-    white_bg.alpha_composite(resized_image)
+    print("[BODY] Cropping empty transparent space tightly...")
+    bbox = no_bg_image.getbbox()
+    if bbox:
+        cropped_image = no_bg_image.crop(bbox)
+    else:
+        cropped_image = no_bg_image
+        
+    print("[BODY] Resizing foreground & compositing onto solid white background...")
+    # TripoSR requires a solid background to infer geometry correctly.
+    # Paste the foreground centered onto a pure white (255, 255, 255) background.
+    # The foreground is resized to fit within 85% of the target canvas.
+    target_size = 512
+    max_dim = int(target_size * 0.85)
+    
+    w, h = cropped_image.size
+    scale = max_dim / max(w, h)
+    new_w = int(w * scale)
+    new_h = int(h * scale)
+    
+    resample_filter = getattr(Image, "Resampling", Image).LANCZOS
+    resized_fg = cropped_image.resize((new_w, new_h), resample_filter)
+    
+    white_bg = Image.new("RGBA", (target_size, target_size), (255, 255, 255, 255))
+    paste_x = (target_size - new_w) // 2
+    paste_y = (target_size - new_h) // 2
+    white_bg.alpha_composite(resized_fg, (paste_x, paste_y))
     final_image = white_bg.convert("RGB")
     
     print("[BODY] Extracting 3D geometry locally...")
