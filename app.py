@@ -123,7 +123,7 @@ def generate_3d(image: Image.Image):
 # 3. FastAPI Endpoints
 @app.post("/summon")
 @app.post("/api/summon")
-async def summon_protocol(req: SummonRequest):
+def summon_protocol(req: SummonRequest):
     try:
         # Phase 1: Brain (T2I)
         image = generate_image(req.prompt)
@@ -156,14 +156,14 @@ async def summon_protocol(req: SummonRequest):
 
 @app.post("/api/extract")
 @app.post("/extract")
-async def extract_object(req: ExtractRequest):
+def extract_object(req: ExtractRequest):
     temp_glb_path = None
     try:
         # 1. Decode base64 PNG or fetch from URL
         if req.image.startswith("http://") or req.image.startswith("https://"):
             import httpx
-            async with httpx.AsyncClient() as client:
-                res = await client.get(req.image, timeout=30.0)
+            with httpx.Client() as client:
+                res = client.get(req.image, timeout=30.0)
                 if res.status_code != 200:
                     raise HTTPException(status_code=400, detail=f"Failed to fetch image: status {res.status_code}")
                 image_bytes = res.content
