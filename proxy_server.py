@@ -196,6 +196,7 @@ async def summon_protocol(req: SummonRequest):
     1. Append system formatting prompt.
     2. Request 2D image via Fal.ai or Replicate.
     3. Forward generated URL to Local Machine's extract API.
+    4. If Fal.ai/Replicate fails (e.g. billing exhaustion), fall back to local generation.
     """
     # Build System-level prompt modification
     enhanced_prompt = f"A high-quality 3D asset of {req.prompt}, white background, orthographic projection, front view."
@@ -207,48 +208,75 @@ async def summon_protocol(req: SummonRequest):
     async with httpx.AsyncClient() as client:
         # Step 1: Generate 2D image from Brain
         image_url = None
+        use_local_fallback = False
         try:
             if os.getenv("FAL_KEY"):
-                image_url = await generate_image_fal(enhanced_prompt, client)
+                try:
+                    image_url = await generate_image_fal(enhanced_prompt, client)
+                except Exception as e:
+                    logger.warning(f"Fal.ai generation failed, trying local fallback: {str(e)}")
+                    use_local_fallback = True
             elif os.getenv("REPLICATE_API_TOKEN"):
-                image_url = await generate_image_replicate(enhanced_prompt, client)
+                try:
+                    image_url = await generate_image_replicate(enhanced_prompt, client)
+                except Exception as e:
+                    logger.warning(f"Replicate generation failed, trying local fallback: {str(e)}")
+                    use_local_fallback = True
             else:
-                logger.error("[SYSTEM ERROR] Summoning Failed: No API credentials found in environment.")
-                print("Summoning Failed: No API credentials found in environment")
-                raise HTTPException(
-                    status_code=500, 
-                    detail="Summoning Failed: Environment lacks FAL_KEY or REPLICATE_API_TOKEN."
-                )
+                logger.info("No cloud API keys configured. Using local fallback.")
+                use_local_fallback = True
         except Exception as e:
-            logger.error(f"[SYSTEM ERROR] Summoning Failed during 2D generation: {str(e)}")
-            print(f"Summoning Failed: {str(e)}")
-            return {"status": "Summoning Failed", "error": str(e)}
+            logger.error(f"[SYSTEM ERROR] Exception during cloud 2D generation: {str(e)}")
+            use_local_fallback = True
 
-        logger.info(f"[SUMMON] 2D Image Generated Successfully: {image_url}")
-        
-        # Step 2: Forward 2D Image to Local 3D Forge
-        logger.info(f"[SUMMON] Forwarding image URL to Local Forge: {local_url}/api/extract")
-        try:
-            local_response = await client.post(
-                f"{local_url}/api/extract",
-                json={"image": image_url},
-                timeout=180.0 # High timeout for mesh generation
-            )
+        if not use_local_fallback and image_url:
+            logger.info(f"[SUMMON] 2D Image Generated Successfully: {image_url}")
             
-            if local_response.status_code != 200:
-                logger.error(f"[SYSTEM ERROR] Local Forge returned status {local_response.status_code}: {local_response.text}")
-                print(f"Summoning Failed: Local Forge returned status {local_response.status_code}")
-                return {"status": "Local Forge Extraction Failed", "detail": local_response.text}
-            
-            logger.info("[SUMMON] Successful local mesh extraction completed.")
-            print("Summoning Succeeded - 3D Mesh Received")
-            # Return GLB mesh bytes directly, matching local response payload
-            return Response(content=local_response.content, media_type="model/gltf-binary")
-            
-        except httpx.RequestError as exc:
-            logger.error(f"[SYSTEM ERROR] Connection to Local Forge failed: {exc}")
-            print(f"Summoning Failed: Connection to Local Forge failed: {exc}")
-            return {"status": "Connection to Local Forge failed", "error": str(exc)}
+            # Step 2: Forward 2D Image to Local 3D Forge
+            logger.info(f"[SUMMON] Forwarding image URL to Local Forge: {local_url}/api/extract")
+            try:
+                local_response = await client.post(
+                    f"{local_url}/api/extract",
+                    json={"image": image_url},
+                    timeout=180.0 # High timeout for mesh generation
+                )
+                
+                if local_response.status_code == 200:
+                    logger.info("[SUMMON] Successful local mesh extraction completed.")
+                    print("Summoning Succeeded - 3D Mesh Received")
+                    return Response(content=local_response.content, media_type="model/gltf-binary")
+                else:
+                    logger.error(f"[SYSTEM ERROR] Local Forge returned status {local_response.status_code}: {local_response.text}")
+                    logger.info("Retrying with full local summon fallback...")
+                    use_local_fallback = True
+                
+            except httpx.RequestError as exc:
+                logger.error(f"[SYSTEM ERROR] Connection to Local Forge failed: {exc}")
+                logger.info("Retrying with full local summon fallback...")
+                use_local_fallback = True
+
+        if use_local_fallback:
+            logger.info(f"[SUMMON] Initializing full local generation fallback at {local_url}/api/summon")
+            try:
+                local_response = await client.post(
+                    f"{local_url}/api/summon",
+                    json={"prompt": req.prompt},
+                    timeout=300.0 # High timeout for local SD + TripoSR CPU generation
+                )
+                
+                if local_response.status_code != 200:
+                    logger.error(f"[SYSTEM ERROR] Local fallback summon returned status {local_response.status_code}: {local_response.text}")
+                    return {"status": "Local Fallback Failed", "detail": local_response.text}
+                
+                logger.info("[SUMMON] Successful local fallback mesh generation completed.")
+                print("Summoning Succeeded (via Local Fallback)")
+                return Response(content=local_response.content, media_type="model/gltf-binary")
+                
+            except httpx.RequestError as exc:
+                logger.error(f"[SYSTEM ERROR] Connection to Local Summon failed: {exc}")
+                print(f"Summoning Failed: Connection to Local Summon failed: {exc}")
+                return {"status": "Connection to Local Summon failed", "error": str(exc)}
+
 
 if __name__ == "__main__":
     import uvicorn
