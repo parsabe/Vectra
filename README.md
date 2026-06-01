@@ -128,7 +128,7 @@
 
 <p>If you utilize this protocol, the VRAM orchestration logic, or the Deep Splat Excavation (DBSE) algorithm in your own academic research, please cite the associated Master's Thesis:</p>
 
-<pre><code>@mastersthesis{vectra2026,
+<pre><code>@article{vectra2026,
   author  = {Parsa Besharat},
   title   = {Vectra: The Quarantine Matrix, Constraining Neural Hallucinations in 3D Gaussian Environment},
   school  = {TU Bergakademie Freiberg},
