@@ -41,15 +41,15 @@
 <p>To fully observe the interactive nature of the Vectra Spatial Computing Protocol, including the non-blocking rendering loop and the real-time VRAM orchestration, please review the supplementary video demonstration below.</p>
 
 <div align="center">
-  <video width="700" controls>
-    <source src="YOUR_VIDEO_URL_HERE.mp4" type="video/mp4">
-    Your browser does not support the HTML5 video tag.
-  </video>
+  <a href="https://youtu.be/D-EFJVIRx9Y">
+    <img src="https://img.youtube.com/vi/D-EFJVIRx9Y/maxresdefault.jpg" 
+         alt="Vectra - Quarantine Matrix Demonstration" 
+         width="100%">
+  </a>
   <br>
-  <i>System demonstration and real-time execution.</i>
+  <b>Click the image to watch the video</b>
 </div>
 
-<br>
 
 ## Introduction
 
@@ -128,7 +128,7 @@
 
 <p>If you utilize this protocol, the VRAM orchestration logic, or the Deep Splat Excavation (DBSE) algorithm in your own academic research, please cite the associated Master's Thesis:</p>
 
-<pre><code>@mastersthesis{vectra2026,
+<pre><code>@article{vectra2026,
   author  = {Parsa Besharat},
   title   = {Vectra: The Quarantine Matrix, Constraining Neural Hallucinations in 3D Gaussian Environment},
   school  = {TU Bergakademie Freiberg},
