@@ -15,7 +15,8 @@
     <a href="#video-demonstration">Video Demo</a> •
     <a href="#introduction">Introduction</a> •
     <a href="#system-architecture">Architecture</a> •
-    <a href="#hardware-requirements">Requirements</a>
+    <a href="#hardware-requirements">Requirements</a> •
+       <a href="https://www.researchgate.net/publication/408133286_Vectra_The_Quarantine_Matrix_Constraining_Neural_Hallucinations_in_3D_Gaussian_Environments">Read paper</a> 
   </p>
 
   <br>
