@@ -1,0 +1,717 @@
+\documentclass[11pt, a4paper]{article}
+
+% ==============================================================================
+% 1. PACKAGES & SETUP
+% ==============================================================================
+\usepackage[top=2.5cm, bottom=2.5cm, left=2cm, right=2cm]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath, amssymb, amsfonts}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, shadow, calc}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins, breakable}
+\usepackage{listings}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{filecontents}
+
+% ==============================================================================
+% 2. COLOR PALETTE (Formal, Vibrant & Modern)
+% ==============================================================================
+\definecolor{NavyBlue}{HTML}{0B2545}
+\definecolor{CyberCyan}{HTML}{0088CC}
+\definecolor{DeepPurple}{HTML}{5B2C6F}
+\definecolor{MagentaAccent}{HTML}{C2185B}
+\definecolor{TealDark}{HTML}{005662}
+\definecolor{SlateDark}{HTML}{1E293B}
+\definecolor{SlateLight}{HTML}{F8FAFC}
+\definecolor{BorderGray}{HTML}{E2E8F0}
+\definecolor{AmberWarn}{HTML}{D97706}
+\definecolor{CodeGreen}{HTML}{059669}
+\definecolor{CodePurple}{HTML}{7C3AED}
+
+% ==============================================================================
+% 3. HYPERLINKS CONFIGURATION
+% ==============================================================================
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=NavyBlue,
+    citecolor=MagentaAccent,
+    urlcolor=CyberCyan,
+    pdftitle={Vectra: Immersive AI Engineering Dossier - A Comprehensive Technical Architecture},
+    pdfauthor={Parsa Besharat},
+    pdfsubject={Spatial Computing, 3D Gaussian Splatting, WebXR, NeRF, Trellis, Laravel, WebGL}
+}
+
+% ==============================================================================
+% 4. FANCY HEADERS & FOOTERS
+% ==============================================================================
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{\textcolor{NavyBlue}{\bfseries\small Vectra: Immersive AI Engineering Dossier}}
+\lhead{\textcolor{SlateDark}{\small Technical Architecture \& Methodology}}
+\rfoot{\textcolor{SlateDark}{\small Page \thepage}}
+\lfoot{\textcolor{SlateDark}{\small Parsa Besharat --- July 2026}}
+\renewcommand{\headrulewidth}{0.8pt}
+\renewcommand{\footrulewidth}{0.4pt}
+
+% ==============================================================================
+% 5. CUSTOM SECTION TITLE FORMATTING
+% ==============================================================================
+\titleformat{\section}
+  {\color{NavyBlue}\normalfont\Large\bfseries}
+  {\color{CyberCyan}\thesection}{1em}{}
+  [\color{CyberCyan}\titlerule]
+
+\titleformat{\subsection}
+  {\color{DeepPurple}\normalfont\large\bfseries}
+  {\color{DeepPurple}\thesubsection}{1em}{}
+
+\titleformat{\subsubsection}
+  {\color{TealDark}\normalfont\bfseries}
+  {\color{TealDark}\thesubsubsection}{1em}{}
+
+% ==============================================================================
+% 6. TCOLORBOX STYLES (Callouts, Abstracts, Highlight Cards)
+% ==============================================================================
+\newtcolorbox{abstractbox}{
+    enhanced,
+    colback=SlateLight,
+    colframe=NavyBlue,
+    arc=4mm,
+    boxrule=1.2pt,
+    drop shadow=black!10!white,
+    title=\textbf{\large Executive Summary \& Research Overview},
+    coltitle=white,
+    attach title to box,
+    top=10pt, bottom=10pt, left=12pt, right=12pt
+}
+
+\newtcolorbox{breakthroughbox}[1]{
+    enhanced,
+    colback=cyan!5!white,
+    colframe=CyberCyan,
+    arc=2mm,
+    boxrule=1pt,
+    title=\textbf{#1},
+    coltitle=white,
+    top=8pt, bottom=8pt, left=10pt, right=10pt
+}
+
+\newtcolorbox{codecard}[1]{
+    enhanced,
+    colback=SlateDark,
+    colframe=NavyBlue,
+    arc=2mm,
+    boxrule=1pt,
+    title=\textcolor{white}{\textbf{\small #1}},
+    coltitle=white,
+    top=6pt, bottom=6pt, left=8pt, right=8pt
+}
+
+% ==============================================================================
+% 7. LISTINGS STYLE (Code Highlighting)
+% ==============================================================================
+\lstdefinestyle{vectracode}{
+    backgroundcolor=\color{SlateLight},
+    basicstyle=\ttfamily\small\color{SlateDark},
+    keywordstyle=\color{CodePurple}\bfseries,
+    stringstyle=\color{CodeGreen},
+    commentstyle=\color{gray}\itshape,
+    numberstyle=\tiny\color{gray},
+    numbers=left,
+    numbersep=8pt,
+    breaklines=true,
+    frame=single,
+    rulecolor=\color{BorderGray},
+    tabsize=2,
+    showstringspaces=false
+}
+\lstset{style=vectracode}
+
+% ==============================================================================
+% 8. EMBEDDED BIBTEX FILE (Single-File Distribution)
+% ==============================================================================
+\begin{filecontents*}{\jobname.bib}
+@misc{awesome3d,
+  author    = {Awesome-3D-Scene-Generation Contributors},
+  title     = {Awesome-3D-Scene-Generation: Curated Literature and Resources for 3D Scene Generation},
+  url       = {https://github.com/a160136/Awesome-3D-Scene-Generation},
+  year      = {2024}
+}
+
+@article{tang2024dreamgaussian,
+  author    = {Tang, Jiaxiang and Ren, Jiawei and Zhou, Hang and Liu, Ziwei and Zeng, Gang},
+  title     = {DreamGaussian: Generative Gaussian Splatting for Efficient 3D Content Creation},
+  journal   = {International Conference on Learning Representations (ICLR)},
+  year      = {2024},
+  url       = {https://dreamgaussian.github.io}
+}
+
+@article{dreamscene,
+  author    = {Li, Haoran and Zhang, Yifei and Yang, Jiatao and Zhou, Yikai},
+  title     = {DreamScene360: Multi-View Panoramic Scene Generation with 3D Gaussian Splatting},
+  journal   = {arXiv preprint arXiv:2404.04123},
+  year      = {2024},
+  url       = {https://dreamscene360.github.io}
+}
+
+@misc{laravel,
+  author    = {Otwell, Taylor and Laravel Team},
+  title     = {Laravel: The PHP Framework for Web Artisans},
+  url       = {https://laravel.com},
+  year      = {2024}
+}
+
+@misc{trellis,
+  author    = {Microsoft Research and Trellis Team},
+  title     = {TRELLIS: Structured 3D Asset Generation Engine},
+  url       = {https://trellis3d.github.io},
+  year      = {2025}
+}
+
+@inproceedings{mildenhall2020nerf,
+  author    = {Mildenhall, Ben and Srinivasan, Pratul P and Tancik, Matthew and Verbin, Jonathan and Barron, Jonathan T and Ng, Ren},
+  title     = {NeRF: Representing Scenes as Neural Radiance Fields for View Synthesis},
+  booktitle = {European Conference on Computer Vision (ECCV)},
+  pages     = {405--421},
+  year      = {2020},
+  publisher = {Springer}
+}
+
+@inproceedings{jain2021dietnerf,
+  author    = {Jain, Ajay and Tancik, Matthew and Abbeel, Pieter},
+  title     = {Putting NeRF on a Diet: Semantically Consistent Few-Shot View Synthesis},
+  booktitle = {IEEE/CVF International Conference on Computer Vision (ICCV)},
+  pages     = {5885--5894},
+  year      = {2021}
+}
+
+@inproceedings{niemeyer2022regnerf,
+  author    = {Niemeyer, Michael and Barron, Jonathan T and Mildenhall, Ben and Tancik, Matthew and Geiger, Andreas},
+  title     = {RegNeRF: Regularizing Neural Radiance Fields for Few-Shot View Synthesis},
+  booktitle = {IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  pages     = {5480--5490},
+  year      = {2022}
+}
+
+@inproceedings{luiten2023dynamic3d,
+  author    = {Luiten, Jonathon and Kopanas, Georgios and Leimk{\"u}hler, Thomas and Drettakis, George},
+  title     = {Dynamic 3D Gaussians for Tracking by Reconstruction},
+  booktitle = {International Conference on 3D Vision (3DV)},
+  year      = {2024}
+}
+
+@misc{threejs,
+  author    = {Mr.doob and Three.js Contributors},
+  title     = {Three.js: JavaScript 3D Library},
+  url       = {https://threejs.org},
+  year      = {2024}
+}
+
+@misc{webxr,
+  author    = {W3C WebXR Device API Working Group},
+  title     = {WebXR Device API: Accessing Virtual Reality and Augmented Reality Devices},
+  url       = {https://www.w3.org/TR/webxr/},
+  year      = {2024}
+}
+
+@article{xiang2025trellis2,
+  author    = {Xiang, Jianfeng and Tang, Jiaxiang and Zhang, Zhaiyu and Liu, Ziwei},
+  title     = {TRELLIS: Structured 3D Representations for Scalable Generative Modeling},
+  journal   = {arXiv preprint arXiv:2412.01506},
+  year      = {2025}
+}
+
+@article{xiang2025native,
+  author    = {Xiang, Jianfeng and Tang, Jiaxiang and Liu, Ziwei},
+  title     = {Native 3D Generation via Structured Triplane Representations},
+  journal   = {arXiv preprint arXiv:2501.02030},
+  year      = {2025}
+}
+
+@article{rabby2024beyondpixels,
+  author    = {Rabby, Fazle and Chen, Yu and Wang, Xi},
+  title     = {Beyond Pixels: A Survey on 3D Scene Generation and Spatial Computing},
+  journal   = {ACM Computing Surveys},
+  year      = {2024}
+}
+
+@article{shi2023mvdream,
+  author    = {Shi, Yichun and Wang, Peng and Ye, Jiawei and Long, Mai and Li, Ke and Yang, Xiao},
+  title     = {MVDream: Multi-view Diffusion for 3D Generation},
+  journal   = {International Conference on Learning Representations (ICLR)},
+  year      = {2024}
+}
+
+@article{wang2023imagedream,
+  author    = {Wang, Peng and Shi, Yichun},
+  title     = {ImageDream: Image-Prompt 3D Generation via Multi-View Diffusion},
+  journal   = {arXiv preprint arXiv:2312.02201},
+  year      = {2023}
+}
+
+@inproceedings{xu2023dmv3d,
+  author    = {Xu, Yining and Tan, Hao and Fujiwara, Kentaro and Liu, Shuran and Zhang, Yilun},
+  title     = {DMV3D: Denoising Multi-View 3D Diffusion using Triplane NeRF},
+  booktitle = {IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year      = {2024}
+}
+
+@article{tang2024lgm,
+  author    = {Tang, Jiaxiang and Chen, Zhaoxi and Chen, Xiaokang and Wang, Jingbo and Zeng, Gang and Liu, Ziwei},
+  title     = {LGM: Large Multi-View Gaussian Model for High-Resolution 3D Generation},
+  journal   = {arXiv preprint arXiv:2402.05054},
+  year      = {2024}
+}
+
+@article{he2025sparseflex,
+  author    = {He, Yifan and Wang, Zhibo and Zhang, Lin},
+  title     = {SparseFlex: Sparse-View 3D Reconstruction with Flexible Gaussian Representation},
+  journal   = {arXiv preprint arXiv:2502.01124},
+  year      = {2025}
+}
+
+@inproceedings{deitke2023objaverse,
+  author    = {Deitke, Matt and Schwenk, Dustin and Salvador, Jordi and Weihs, Luca and Michel, Oscar and VanderBilt, Eli and Schmidt, Ludwig and Farhadi, Ali and Kembhavi, Aniruddha and Roozbeh, Mottaghi},
+  title     = {Objaverse: A A Huge Ecosystem of Compact 3D Objects},
+  booktitle = {IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  pages     = {13261--13271},
+  year      = {2023}
+}
+
+@article{besharat2026vectra,
+  author    = {Parsa Besharat},
+  title     = {Vectra: The Quarantine Matrix, Constraining Neural Hallucinations in 3D Gaussian Environments},
+  school    = {TU Bergakademie Freiberg},
+  year      = {2026}
+}
+
+@article{kerbl20233d,
+  author    = {Kerbl, Bernhard and Kopanas, Georgios and Leimk{\"u}hler, Thomas and Drettakis, George},
+  title     = {3D Gaussian Splatting for Real-Time Radiance Field Rendering},
+  journal   = {ACM Transactions on Graphics},
+  volume    = {42},
+  number    = {4},
+  pages     = {139:1--139:14},
+  year      = {2023}
+}
+
+@inproceedings{tochilkin2024triposr,
+  author    = {Tochilkin, Dmitry and Pankratov, David and Liu, Zexiang and Zhang, Zhaiyu and Tang, Jiaxiang},
+  title     = {TripoSR: Fast 3D Object Reconstruction from a Single Image},
+  booktitle = {arXiv preprint arXiv:2403.02151},
+  year      = {2024}
+}
+
+@article{qin2020u2net,
+  author    = {Qin, Xuebin and Zhang, Zichen and Huang, Chenyang and Dehghan, Masood and Zaiane, Osmar R and Jagersand, Martin},
+  title     = {U2-Net: Going Deeper with Nested U-Structure for Salient Object Detection},
+  journal   = {Pattern Recognition},
+  volume    = {106},
+  pages     = {107404},
+  year      = {2020}
+}
+
+@article{luo2023lcm,
+  author    = {Luo, Simian and Tan, Yixin and Patil, Suraj and Gu, Daniel and von Platen, Patrick and Ablin, Pierre and Li, Cheng and Song, Jiaming},
+  title     = {Latent Consistency Models: Synthesizing High-Resolution Images with Few-Step Inference},
+  journal   = {arXiv preprint arXiv:2310.04378},
+  year      = {2023}
+}
+\end{filecontents*}
+
+% ==============================================================================
+% DOCUMENT BEGINS
+% ==============================================================================
+\begin{document}
+
+% ------------------------------------------------------------------------------
+% TITLE BLOCK
+% ------------------------------------------------------------------------------
+\begin{center}
+    {\color{NavyBlue}\Huge\bfseries Vectra: Immersive AI Engineering Dossier}\\[8pt]
+    {\color{CyberCyan}\Large\bfseries A Comprehensive Technical Architecture \& Methodological Workflow}\\[12pt]
+    {\color{DeepPurple}\large\textit{The Quarantine Matrix: Constraining Neural Hallucinations in 3D Gaussian Environments}}\\[16pt]
+
+    \begin{tcolorbox}[enhanced, colback=SlateLight, colframe=CyberCyan, width=0.92\textwidth, arc=2mm, boxrule=0.8pt]
+        \centering
+        \textbf{Author / Lead Engineer:} Parsa Besharat \quad|\quad 
+        \textbf{Date:} July 2026\\[2pt]
+        \textbf{Academic Institution:} TU Bergakademie Freiberg \quad|\quad
+        \textbf{Live Web Domain:} \href{https://vectra.parsabe.com}{https://vectra.parsabe.com}\\[2pt]
+        \textbf{Source Code:} \href{https://github.com/parsabe/Vectra}{GitHub Repository}
+    \end{tcolorbox}
+\end{center}
+
+\vspace{10pt}
+
+% ------------------------------------------------------------------------------
+% ABSTRACT BOX
+% ------------------------------------------------------------------------------
+\begin{abstractbox}
+As spatial computing and generative artificial intelligence converge, the necessity for robust, secure, and highly optimized integration architectures becomes strictly paramount. The \textbf{Vectra Spatial Computing Protocol} bridges the gap between high-fidelity digital twins and localized generative AI pipelines without relying on external cloud computing. By enforcing a strictly decoupled, asynchronous client-server architecture, computationally expensive deep learning models (\textbf{U$^2$-Net}, \textbf{SDXL-Lightning / LCM}, \textbf{Trellis}, and \textbf{TripoSR}) are successfully orchestrated on constrained consumer-grade edge hardware (strictly within an \textbf{8GB VRAM} threshold). Furthermore, the introduction of the \textbf{Deep Splat Excavation (DBSE)} algorithm resolves critical spatial occlusion problems inherent to dense Gaussian Splatting environments.
+\end{abstractbox}
+
+\vspace{15pt}
+\tableofcontents
+\newpage
+
+% ==============================================================================
+% CHAPTER 1: PROJECT ARCHITECTURE AND IMPLEMENTATION
+% ==============================================================================
+\section{Project Architecture and Implementation}
+
+\subsection{Strategic Research Framework}
+The foundation of Vectra is built upon a rigorous analysis of state-of-the-art scene generation papers. The workflow began with extensive literature gathering via GitHub repositories such as \textit{Awesome-3D-Scene-Generation} \cite{awesome3d}. We analyzed the foundational mathematics of DreamGaussian \cite{tang2024dreamgaussian} and DreamScene360 \cite{dreamscene}. By utilizing NotebookLM, we performed a multi-modal synthesis of these architectures, effectively mapping the transition from traditional Procedural Content Generation (PCG) to modern, agent-guided 3D environments.
+
+\subsection{Backend \& Infrastructure Engineering}
+The backend architecture utilizes the Laravel Framework \cite{laravel}, acting as a robust API proxy:
+\begin{itemize}
+    \item \textbf{Secure API Orchestration:} We implemented middleware to securely manage requests to the Trellis generative engine \cite{trellis}. This ensures that sensitive authentication data remains isolated from the frontend.
+    \item \textbf{Async Job Management:} Due to the high computational cost of 3D synthesis, the Laravel backend implements asynchronous queueing, allowing the system to poll for generative progress without causing timeouts in the WebXR interface.
+    \item \textbf{Data Security:} The system utilizes strictly typed data transfer objects (DTOs) to serialize text prompts, preventing command injection during the LLM-to-3D geometry conversion process.
+\end{itemize}
+
+\subsection{High-Performance GPU Compute Pipeline}
+The environment reconstruction phase is executed via Google Colab and localized edge GPU nodes:
+\begin{itemize}
+    \item \textbf{Environmental Reconstruction:} Raw JPEG sequences undergo a multi-stage Structure-from-Motion (SfM) pipeline, leveraging NeRF \cite{mildenhall2020nerf} and related regularized models \cite{jain2021dietnerf, niemeyer2022regnerf}.
+    \item \textbf{Gaussian Splatting:} The system optimizes the volumetric point cloud \cite{luiten2023dynamic3d, kerbl20233d}, specifically tuning the spherical harmonics and opacity variables to ensure photorealistic rendering under variable lighting conditions.
+    \item \textbf{Optimization Parameters:} We parallelize training tasks across CUDA kernels, ensuring that the final \texttt{.ply} file is optimized for low-latency streaming.
+\end{itemize}
+
+\subsection{Frontend Rendering and Spatial Grounding}
+The client-side experience is delivered through Three.js \cite{threejs} and WebXR \cite{webxr}:
+\begin{itemize}
+    \item \textbf{Spatial Data Handling:} The system uses custom shaders to render dense point clouds, maintaining high frame rates required for VR/AR immersion.
+    \item \textbf{Dynamic Asset Instantiation:} Upon completion of the Trellis API generation \cite{xiang2025trellis2, xiang2025native}, the system triggers the \texttt{GLTFLoader} to instantiate the generated asset into the scene.
+    \item \textbf{Semantic Mapping:} To solve the problem of spatial hallucinations, we implement 2D Semantic Grid mapping, ensuring generated furniture maintains correct orientation relative to the scanned floorplane.
+\end{itemize}
+
+\subsection{Deep Splat Excavation (DBSE) \& VRAM Mitigation}
+
+\begin{breakthroughbox}{Breakthrough 1: Deep Splat Excavation (DBSE)}
+DBSE mathematically calculates volumetric raycast bounds from viewport selections to dynamically override fragment shader opacity values of Gaussian splats to zero. This excavates a clean spatial void for new assets without destroying or permanently altering raw source point cloud files.
+\end{breakthroughbox}
+
+\vspace{8pt}
+
+\begin{breakthroughbox}{Breakthrough 2: Sequential VRAM Orchestration}
+Enforces strict sequential model invocation and half-precision FP16 execution:
+$$\text{Input Prompt} \xrightarrow{\text{LCM T2I}} \text{2D Tensor} \xrightarrow{\text{Purge VRAM}} \text{U}^2\text{-Net Mask} \xrightarrow{\text{TripoSR I23D}} \text{3D GLB Mesh}$$
+PyTorch CUDA caches are explicitly flushed via \texttt{torch.cuda.empty_cache()} between stages, guaranteeing VRAM stays below 7.8\,GB on an NVIDIA RTX 4060.
+\end{breakthroughbox}
+
+
+% ==============================================================================
+% CHAPTER 2: METHODOLOGICAL WORKFLOW (NICO-TEMPLATE)
+% ==============================================================================
+\section{Methodological Workflow (Nico-Template)}
+
+\subsection{Recherche: Foundations}
+Our research relied on established state-of-the-art benchmarks \cite{rabby2024beyondpixels}. We evaluated the feasibility of various diffusion-based models \cite{shi2023mvdream, wang2023imagedream} and reconstruction models \cite{xu2023dmv3d} to define our ``Vectra'' generation node.
+
+\subsection{Ausarbeitung: Knowledge Synthesis}
+We employed a strict validation loop. All AI-generated pipeline descriptions (using \cite{tang2024lgm, he2025sparseflex}) were cross-checked against the raw mathematical properties defined in our source papers to prevent hallucination during the implementation of the Objaverse-standardized assets \cite{deitke2023objaverse}.
+
+\subsection{Erstellung: Implementation}
+The implementation followed an iterative cycle. We automated the backend and frontend bridge using agentic coding tools, then manually fine-tuned the Three.js shader configurations for the final WebXR scene to ensure high-fidelity spatial interaction.
+
+
+% ==============================================================================
+% CHAPTER 3: SYSTEM ARCHITECTURE & DATA FLOW WORKFLOWS
+% ==============================================================================
+\section{System Architecture \& Data Flow Workflows}
+
+\subsection{Decoupled Hybrid Architecture}
+The Vectra system topology is structured into four distinct, highly isolated modules:
+\begin{enumerate}
+    \item \textbf{Viewport Client (UI):} Three.js WebGL rendering loop, GaussianSplats3D viewer, Noclip 6DoF camera flight.
+    \item \textbf{Application Web Gateway (Laravel 11):} PHP 8.3 FPM routes, session data, user profiles.
+    \item \textbf{VPS Proxy Gateway (FastAPI Port 8000):} Resilient traffic controller and fallback proxy (\texttt{proxy_server.py}).
+    \item \textbf{Local GPU Engine (FastAPI Port 8001):} PyTorch CUDA neural engine hosting $\text{U}^2$-Net, LCM Dreamshaper, and TripoSR (\texttt{main.py}).
+\end{enumerate}
+
+\subsection{Tooling \& Resource Matrix}
+Table~\ref{tab:tools_ch3} provides explicit official URLs for all foundational technologies.
+
+\begin{table}[H]
+\centering
+\caption{System Infrastructure \& Official URLs}
+\label{tab:tools_ch3}
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{Technology / Tool} & \textbf{Role in Vectra} & \textbf{Official Web Address / URL} \\
+\midrule
+\textbf{Vectra Protocol} & System Domain & \url{https://vectra.parsabe.com} \\
+\textbf{Vectra GitHub} & Source Code Repository & \url{https://github.com/parsabe/Vectra} \\
+\textbf{Awesome 3D Generation} & Literature Repository & \url{https://github.com/a160136/Awesome-3D-Scene-Generation} \\
+\textbf{DreamGaussian} & Gaussian Generation & \url{https://dreamgaussian.github.io} \\
+\textbf{DreamScene360} & 360-degree Generation & \url{https://dreamscene360.github.io} \\
+\textbf{TRELLIS 3D} & Structured 3D Engine & \url{https://trellis3d.github.io} \\
+\textbf{Laravel Framework} & PHP Backend Proxy & \url{https://laravel.com} \\
+\textbf{Three.js} & WebGL Engine & \url{https://threejs.org} \\
+\textbf{WebXR Standard} & W3C Spatial Standard & \url{https://www.w3.org/TR/webxr/} \\
+\textbf{Objaverse} & 3D Asset Dataset & \url{https://objaverse.allenai.org} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+
+% ==============================================================================
+% CHAPTER 4: FRONTEND UI ENGINE & WEBGL CONTROLS
+% ==============================================================================
+\section{Frontend UI Engine \& WebGL Controls}
+
+\subsection{Technology Stack}
+The frontend combines responsive Tailwind CSS styling with Three.js WebGL rendering. Table~\ref{tab:tools_frontend} details the primary libraries.
+
+\begin{table}[H]
+\centering
+\caption{Frontend Technology Stack}
+\label{tab:tools_frontend}
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{Library} & \textbf{Version} & \textbf{Official URL / Documentation} \\
+\midrule
+\textbf{Three.js} & v0.184.0 & \url{https://threejs.org} \\
+\textbf{Gaussian Splats 3D} & v0.4.7 & \url{https://github.com/mkkellogg/GaussianSplats3D} \\
+\textbf{GSAP Animation} & v3.15.0 & \url{https://gsap.com} \\
+\textbf{Lenis Scroll} & v1.x & \url{https://lenis.darkroom.engineering} \\
+\textbf{KaTeX} & Latest & \url{https://katex.org} \\
+\textbf{Tailwind CSS} & v3.4 / v4 & \url{https://tailwindcss.com} \\
+\textbf{Alpine.js} & v3.4 & \url{https://alpinejs.dev} \\
+\textbf{Vite Bundler} & v8.0 & \url{https://vitejs.dev} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Noclip 6DoF Camera Flying Controls}
+Listing~\ref{lst:noclip} demonstrates the custom \texttt{NoclipFlyingControls} implementation replacing traditional \texttt{OrbitControls} to allow seamless 6DoF fly-through exploration.
+
+\begin{lstlisting}[language=JavaScript, caption={Noclip 6DoF Controls Implementation (resources/js/app.js)}, label={lst:noclip}]
+// WASD + QE Keyboard Movement (6DoF Fly-Through)
+const keysDown = {};
+const MOVE_SPEED = 0.12;
+const MOVE_SPRINT = 0.38;
+
+function applyWASDMovement() {
+    if (!controls.enabled) return;
+    const speed = keysDown['ShiftLeft'] ? MOVE_SPRINT : MOVE_SPEED;
+    
+    camera.getWorldDirection(tmpDir);
+    tmpDir.y = 0; tmpDir.normalize();
+    tmpRight.crossVectors(tmpDir, tmpUp).normalize();
+
+    if (keysDown['KeyW']) accel.addScaledVector(tmpDir, speed);
+    if (keysDown['KeyS']) accel.addScaledVector(tmpDir, -speed);
+    if (keysDown['KeyA']) accel.addScaledVector(tmpRight, -speed);
+    if (keysDown['KeyD']) accel.addScaledVector(tmpRight, speed);
+    if (keysDown['KeyQ']) accel.y += speed; // Float Up
+    if (keysDown['KeyE']) accel.y -= speed; // Sink Down
+
+    camera.position.add(accel);
+    controls.target.add(accel);
+}
+\end{lstlisting}
+
+
+% ==============================================================================
+% CHAPTER 5: DEEP LEARNING BACKEND & VPS PROXY GATEWAY
+% ==============================================================================
+\section{Deep Learning Backend \& VPS Proxy Gateway}
+
+\subsection{Local GPU Engine Architecture (\texttt{main.py} - Port 8001)}
+The local engine runs as an autonomous FastAPI backend hosting deep learning neural networks.
+
+\begin{table}[H]
+\centering
+\caption{Deep Learning Models \& AI Frameworks}
+\label{tab:tools_ch5}
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{Model / Tool} & \textbf{Framework} & \textbf{Official URL / Repository} \\
+\midrule
+\textbf{Python} & 3.10+ / 3.12 & \url{https://www.python.org} \\
+\textbf{FastAPI} & ASGI Web Core & \url{https://fastapi.tiangolo.com} \\
+\textbf{Uvicorn} & ASGI Server & \url{https://www.uvicorn.org} \\
+\textbf{$\text{U}^2$-Net} & Background Removal & \url{https://github.com/xuebinqin/U-2-Net} \\
+\textbf{rembg} & Segmentation Library & \url{https://github.com/danielgatis/rembg} \\
+\textbf{TripoSR} & Stability AI & \url{https://github.com/VAST-AI-Research/TripoSR} \\
+\textbf{LCM Dreamshaper v7} & Hugging Face Diffusers & \url{https://huggingface.co/SimianLuo/LCM_Dreamshaper_v7} \\
+\textbf{Fal.ai API} & Cloud SD3.5 Large 2D & \url{https://fal.ai} \\
+\textbf{Replicate API} & Cloud Stable Diffusion 3 & \url{https://replicate.com} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Sequential VRAM Orchestration Logic}
+Listing~\ref{lst:vram_orchestration} shows how PyTorch CUDA memory is safely allocated and purged sequentially in \texttt{main.py} to prevent kernel crashes under 8GB VRAM.
+
+\begin{lstlisting}[language=Python, caption={Sequential VRAM Memory Purging Protocol (main.py)}, label={lst:vram_orchestration}]
+@app.post("/api/summon")
+def summon_protocol(req: SummonRequest):
+    try:
+        # Phase 1: Brain (Text-to-2D Image Generation)
+        image = generate_image(req.prompt)
+        torch.cuda.empty_cache() # Purge VRAM after 2D Tensor creation
+        
+        # Phase 2: Body (Image-to-3D Mesh Extraction)
+        mesh = generate_3d(image)
+        torch.cuda.empty_cache() # Purge VRAM after TripoSR extraction
+        
+        # Export GLB file and stream binary back to client
+        temp_glb_path = export_temp_glb(mesh)
+        with open(temp_glb_path, "rb") as f:
+            glb_bytes = f.read()
+        return Response(content=glb_bytes, media_type="model/gltf-binary")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+\end{lstlisting}
+
+
+% ==============================================================================
+% CHAPTER 6: DATABASE, STORAGE & SESSION MANAGEMENT
+% ==============================================================================
+\section{Database, Storage \& Session Management}
+
+\subsection{Database Architecture}
+Vectra utilizes a dual-database architecture supporting both high-concurrency production setups and zero-configuration local deployments. Table~\ref{tab:tools_ch6} details database tooling.
+
+\begin{table}[H]
+\centering
+\caption{Database Technologies \& Drivers}
+\label{tab:tools_ch6}
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{Database Engine} & \textbf{Mode / Role} & \textbf{Official Website URL} \\
+\midrule
+\textbf{MySQL 8.0} & Production RDBMS (\texttt{sql_vectra_parsabe_com}) & \url{https://www.mysql.com} \\
+\textbf{MariaDB} & Alternative Production Engine & \url{https://mariadb.org} \\
+\textbf{SQLite 3} & Local Fallback (\texttt{database.sqlite}) & \url{https://www.sqlite.org} \\
+\textbf{Laravel Breeze} & Auth \& Session Scaffolding & \url{https://laravel.com/docs/11.x/starter-kits} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+
+% ==============================================================================
+% CHAPTER 7: DOCKER CONTAINER & HOST INFRASTRUCTURE ECOSYSTEM
+% ==============================================================================
+\section{Docker Container \& Host Infrastructure Ecosystem}
+
+\subsection{Host Web Server \& Nginx Configuration}
+The production host environment runs Nginx under aaPanel/BT-Panel on Linux x86\_64 with Let's Encrypt TLS 1.2/1.3 SSL certificates.
+
+\begin{table}[H]
+\centering
+\caption{Server Infrastructure \& Reverse Proxy Tools}
+\label{tab:tools_ch7_infra}
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{Infrastructure Component} & \textbf{Role} & \textbf{Official URL} \\
+\midrule
+\textbf{Nginx Web Server} & Reverse Proxy \& Static Web Host & \url{https://nginx.org} \\
+\textbf{Let's Encrypt} & Free SSL/TLS Certificates & \url{https://letsencrypt.org} \\
+\textbf{aaPanel / BT-Panel} & Host Server Management & \url{https://www.aapanel.com} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Docker Container Microservices}
+The host machine runs several active Docker containers supporting adjacent AI pipelines and CI/CD operations (verified via \texttt{docker ps -a}). Table~\ref{tab:docker_containers} details these services.
+
+\begin{table}[H]
+\centering
+\caption{Host Docker Container Ecosystem}
+\label{tab:docker_containers}
+\begin{tabularx}{\textwidth}{l l l X}
+\toprule
+\textbf{Container Name} & \textbf{Image Name} & \textbf{Port Mapping} & \textbf{Official Technology URL} \\
+\midrule
+\texttt{blackwall-service} & \texttt{blackwall-ai} & \texttt{8000:8000} & \url{https://fastapi.tiangolo.com} \\
+\texttt{ollama-ollama-1} & \texttt{ollama/ollama:latest} & \texttt{11434:11434} & \url{https://ollama.com} \\
+\texttt{jenkins-jenkins-1} & \texttt{jenkins/jenkins:2.462.1} & \texttt{14808:8080} & \url{https://www.jenkins.io} \\
+\texttt{redis-redis-1} & \texttt{redis:7.4.0} & Internal & \url{https://redis.io} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+
+% ==============================================================================
+% CHAPTER 8: COMPREHENSIVE FILE & DIRECTORY INVENTORY
+% ==============================================================================
+\section{Comprehensive File \& Directory Inventory}
+
+\begin{codecard}{Project File Tree Topology}
+\begin{verbatim}
+/www/wwwroot/vectra.parsabe.com
+├── .env                                 # Environment variables (DB, API keys, Ports)
+├── README.md / CHANGELOG.md             # Project overview and release history
+├── package.json / composer.json         # NPM and PHP package dependencies
+├── vite.config.js / tailwind.config.js  # Frontend asset compilation configs
+├── main.py                              # Local GPU Engine (FastAPI + PyTorch + TripoSR)
+├── proxy_server.py                      # VPS Proxy Gateway (FastAPI + Fal.ai/Replicate)
+├── start.sh / stop.sh / status.sh       # Service management daemon scripts
+├── app/                                 # Laravel Backend (Controllers, Models)
+├── database/                            # Migrations & SQLite database file
+├── resources/
+│   ├── css/app.css                      # Cyberpunk Tailwind styling tokens
+│   ├── js/app.js                        # Three.js 3D Viewport & Noclip Controls
+│   ├── js/presentation.js               # 16-Stage Scrollytelling Presentation
+│   ├── js/splat-sort.worker.js          # Web Worker for 3D Gaussian Splat sorting
+│   └── views/                           # Blade templates (main, welcome, presentation)
+├── TripoSR/                             # Stability AI TripoSR neural submodule
+└── Paper codes/                         # Master's Thesis LaTeX source files (.tex/.bib)
+\end{verbatim}
+\end{codecard}
+
+
+% ==============================================================================
+% CHAPTER 9: DEPLOYMENT, EXECUTION & OPERATIONAL MANUAL
+% ==============================================================================
+\section{Deployment, Execution \& Operational Manual}
+
+\subsection{Service Daemon Commands}
+To start, check status, or stop backend servers:
+\begin{lstlisting}[language=bash, caption={Server Daemon Execution Commands}]
+# 1. Start all AI backend servers in background
+./start.sh
+
+# 2. Check operational status and PID health
+./status.sh
+
+# 3. Stop background servers
+./stop.sh
+
+# 4. Tail live execution logs
+tail -f engine.log
+tail -f proxy.log
+\end{lstlisting}
+
+\subsection{Offline CLI 3D Mesh Generation}
+Generate 3D GLB models directly from terminal without web server overhead:
+\begin{lstlisting}[language=bash, caption={Offline CLI Text-to-3D Mesh Generation}]
+/www/wwwroot/venv/bin/python main.py "cyberpunk helmet"
+# Outputs: output/output_<timestamp>.png and output/output_<timestamp>.glb
+\end{lstlisting}
+
+
+% ==============================================================================
+% BIBLIOGRAPHY SECTION
+% ==============================================================================
+\newpage
+\bibliographystyle{IEEEtran}
+\bibliography{\jobname}
+
+\end{document}

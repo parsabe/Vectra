@@ -1,0 +1,441 @@
+================================================================================
+VECTRA SPATIAL COMPUTING PROTOCOL - COMPLETE SYSTEM DOCUMENTATION & WORKFLOW
+The Quarantine Matrix: Constraining Neural Hallucinations in 3D Gaussian Environments
+================================================================================
+Author / Academic Lead : Parsa Besharat
+Institution           : TU Bergakademie Freiberg (2026)
+Project Domain        : vectra.parsabe.com
+Repository Path       : /www/wwwroot/vectra.parsabe.com
+Document Generation   : Full System & Codebase Analysis
+
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+1. CHAPTER 1: EXECUTIVE SUMMARY & RESEARCH OVERVIEW
+2. CHAPTER 2: ARCHITECTURE & END-TO-END WORKFLOW
+3. CHAPTER 3: FRONTEND & WEBGL RENDERING ENGINE (UI LAYER)
+4. CHAPTER 4: DEEP LEARNING & GPU AI BACKEND (SERVER LAYER)
+5. CHAPTER 5: VPS PROXY GATEWAY & FALLBACK INFRASTRUCTURE
+6. CHAPTER 6: DATABASE, STORAGE & SESSION MANAGEMENT
+7. CHAPTER 7: DOCKER CONTAINER & HOST INFRASTRUCTURE ECOSYSTEM
+8. CHAPTER 8: COMPREHENSIVE FILE & DIRECTORY INVENTORY
+9. CHAPTER 9: DEPLOYMENT, EXECUTION & OPERATIONAL MANUAL
+
+
+================================================================================
+1. CHAPTER 1: EXECUTIVE SUMMARY & RESEARCH OVERVIEW
+================================================================================
+1.1 Background & Core Problem
+As spatial computing and generative artificial intelligence converge, integrating 
+AI-generated 3D assets into scanned physical environments (e.g., 3D Gaussian Splatting) 
+traditionally encounters critical bottlenecks:
+  - Severe hardware constraints and Out-Of-Memory (OOM) GPU kernel crashes.
+  - Geometric visual artifacts such as Z-fighting, mesh clipping, and spatial occlusion.
+  - Excessive reliance on latency-prone cloud infrastructure.
+
+1.2 The Vectra Solution
+Vectra bridges the gap between high-fidelity digital twins and localized generative 
+AI pipelines without external cloud dependencies. It operates under a strict consumer 
+edge hardware limit (8GB VRAM maximum threshold, targeting NVIDIA RTX 4060 GPUs).
+
+Key Technical Breakthroughs:
+1. Deep Splat Excavation (DBSE): A mathematical volumetric raycast masking algorithm 
+   that dynamically overrides 3D Gaussian splat opacity values in fragment shaders 
+   to cleanly excavate spatial volume for newly spawned generative assets without 
+   permanently altering source point cloud files.
+2. Sequential VRAM Orchestration: A strict memory recycling pipeline that executes 
+   deep learning models sequentially (U2-Net background removal -> SDXL-Lightning / LCM 2D 
+   latent generation -> TripoSR 3D mesh reconstruction) with PyTorch CUDA cache 
+   purging between steps to prevent memory spillage.
+3. Decoupled Hybrid Client-Server Architecture: A browser-based WebGL/Three.js viewport 
+   communicating with an autonomous Python FastAPI engine through a resilient 
+   VPS Proxy Gateway.
+
+
+================================================================================
+2. CHAPTER 2: ARCHITECTURE & END-TO-END WORKFLOW
+================================================================================
+2.1 High-Level Architecture Diagram
++-------------------------------------------------------------------------------+
+|                            BROWSER CLIENT (UI)                               |
+|  - Three.js + WebGL Render Loop                                               |
+|  - @mkkellogg/gaussian-splats-3d (Point Cloud / Splat Viewer)                  |
+|  - NoclipFlyingControls (WASD + QE 6DoF Flight + Mouse Look)                   |
+|  - DBSE Interactive Bounding-Box Overlay & Scrollytelling (GSAP / Lenis)      |
++-------------------------------------------------------------------------------+
+                                     |
+                          HTTPS / JSON & Binary GLB
+                                     v
++-------------------------------------------------------------------------------+
+|                         NGINX WEB SERVER & LARAVEL 11                        |
+|  - Reverse Proxy Endpoint /api-proxy/  ---> Port 8000 (Proxy Gateway)       |
+|  - Reverse Proxy Endpoint /api-fastapi/ ---> Port 8001 (Local GPU Engine)    |
+|  - Blade Templating (main, welcome/demo, presentation)                        |
+|  - PHP 8.3 & MySQL Database (User Sessions, System Logs, Caches)              |
++-------------------------------------------------------------------------------+
+           |                                                   |
+           v                                                   v
++-----------------------------------+               +---------------------------+
+|    VPS PROXY GATEWAY (Port 8000)   |               | LOCAL GPU ENGINE (8001)   |
+|  - proxy_server.py (FastAPI)      | ---Forward--> | - main.py (FastAPI)       |
+|  - Cloud APIs (Fal.ai / Replicate)|               | - rembg / U2-Net          |
+|  - Fallback Traffic Controller    |               | - LCM Dreamshaper v7 (2D) |
+|                                   |               | - TripoSR (3D Extrusion)  |
++-----------------------------------+               +---------------------------+
+
+2.2 End-to-End Operational Workflows
+
+WORKFLOW A: Spatial Point Cloud Scanning & Rendering
+1. User drops a raw `.ply` or compressed `.ply.gz` spatial scan into the viewport.
+2. JavaScript decompresses the GZIP payload in the browser using Native DecompressionStreams.
+3. Custom hooks (`adjustSplatBufferScales`, `adjustSplatArrayScales`) intercept PlyParser.
+4. Scale exponentiation multiplier (`window.VECTRA_SPLAT_SCALE = 0.05`) corrects bloated splats.
+5. `SortWorker` (Web Worker) continuously sorts splats in background threads for 60 FPS WebGL rendering.
+
+WORKFLOW B: "Extract Mode" (Deep Splat Excavation - DBSE)
+1. User clicks `[EXTRACT MODE]` in viewport UI and draws a 2D bounding rectangle.
+2. WebGL converts viewport 2D coordinates into 3D raycast frustum volume.
+3. DBSE overrides opacity of intersecting splats to 0 in fragment shader (excavating void).
+4. Viewport captures clean object image payload (base64 PNG) or URL.
+5. POST request sent to `/api-proxy/api/extract`.
+6. Proxy forwards request to Local GPU Engine (`/api/extract` on port 8001).
+7. `main.py` processes image with U2-Net, crops bounds, pastes onto white canvas, feeds to TripoSR.
+8. Generated 3D GLB mesh returned to client and anchored precisely inside excavated space.
+
+WORKFLOW C: "Creator Mode" (Text-to-3D Summoning Protocol)
+1. User enters text prompt (e.g. "cyberpunk katana") and clicks `[SUMMON]`.
+2. Request dispatched to Proxy Gateway on port 8000 (`/summon`).
+3. System enhances prompt: "A high-quality 3D asset of <prompt>, white background, orthographic projection, front view."
+4. Proxy attempts Cloud 2D generation (Fal.ai SD3.5 or Replicate SD3).
+5. If Cloud API fails or keys are unconfigured, Proxy seamlessly engages Local Fallback.
+6. Local Fallback calls `main.py` port 8001 (`/api/summon`).
+7. `LCM_Dreamshaper_v7` generates 256x256 orthographic 2D tensor in 2 inference steps (FP16).
+8. `torch.cuda.empty_cache()` purges VRAM.
+9. `rembg` removes background and centers image onto 512x512 white canvas.
+10. `TripoSR` infers implicit 3D vector fields and extracts GLB mesh via marching cubes.
+11. VRAM cleared again via `torch.cuda.empty_cache()`.
+12. Binary GLB payload returned to client browser and placed in active 3D world space.
+
+
+================================================================================
+3. CHAPTER 3: FRONTEND & WEBGL RENDERING ENGINE (UI LAYER)
+================================================================================
+3.1 Technology Stack
+- Framework: Laravel Blade Views + Tailwind CSS v3/v4 + Alpine.js
+- Asset Pipeline: Vite v8 bundler with PostCSS and Autoprefixer
+- 3D Engine: Three.js (v0.184.0) + `@mkkellogg/gaussian-splats-3d` (v0.4.7)
+- Animation & Smooth Scroll: GSAP (v3.15.0) + Lenis Scroll + KaTeX Math rendering
+
+3.2 Page Views
+1. Hub Portal (`resources/views/main.blade.php`, `resources/js/main.js`):
+   - Entry portal featuring a 3D procedural cyberpunk city background canvas (`#bg-city`).
+   - Cyberpunk terminal UI with boot sequence notifications (`#boot-notification`).
+   - Navigation links to Demo (`/demo`), Presentation (`/presentation`), Source Code, Research Paper.
+
+2. Spatial Core Viewport (`resources/views/welcome.blade.php`, `resources/js/app.js`):
+   - Interactive 3D application canvas (`#vectra-canvas`).
+   - Bento-grid telemetry overlays: GPU load, VRAM allocation (4.2GB / 8GB), temperature, grid drift.
+   - Interactive control buttons: `[INJECT SPATIAL SCAN]`, `[Creator Mode]`, `[Extract Mode]`.
+   - Dynamic HUDs for Extract Mode bounding box canvas (`#selection-canvas`) and loading progress.
+   - Configuration Modal (`#creator-config-panel`) for dynamically setting API keys & engine URLs.
+
+3. Scrollytelling Presentation (`resources/views/presentation.blade.php`, `resources/js/presentation.js`):
+   - 16-stage scrollytelling deck showcasing the Master's thesis methodology.
+   - Procedural WebGL Saturn gas giant with storm bands, concentric A/B/C ring divisions, Cassini gap.
+   - 6,000 multi-colored additive stardust particles (`BufferGeometry`).
+   - Post-processing pipeline using `EffectComposer`, `RenderPass`, and `UnrealBloomPass` (strength 1.8).
+   - KaTeX integration for live rendering of LaTeX mathematical equations in scroll stages.
+
+3.3 Key Frontend Features & Algorithms
+- NoclipFlyingControls (in `resources/js/app.js`):
+  Replaces standard OrbitControls with a first-person 6DoF noclip camera system. Supports WASD + QE (float up / sink down), Shift-key sprint, and right-click PointerLock mouse orientation.
+- Custom Splat Scale Correction:
+  Intercepts Gaussian Splats PlyParser (`parseToUncompressedSplatArray`, `parseToUncompressedSplatBuffer`). Applies exponential logarithm checking and `VECTRA_SPLAT_SCALE = 0.05` to fix bloated splat rendering.
+- Web Worker Splat Sorting:
+  Integrates `splat-sort.worker.js` via Vite worker imports to execute distance sorting in off-screen threads, keeping main UI thread smooth at 60 FPS.
+
+
+================================================================================
+4. CHAPTER 4: DEEP LEARNING & GPU AI BACKEND (SERVER LAYER)
+================================================================================
+4.1 Local GPU Engine (`main.py` - Port 8001)
+The primary computational backend hosting PyTorch and neural models locally.
+
+Core Setup & Environment:
+- Thread Constraint: Enforces `OMP_NUM_THREADS=1`, `MKL_NUM_THREADS=1`, `torch.set_num_threads(1)` to avoid CPU thread contention.
+- Device Selection: Automatically detects CUDA GPU (`cuda:0`, FP16) or CPU (FP32).
+
+Loaded Models:
+1. `rembg` (U2-Net):
+   - Session initialized with `u2net` model on CUDA execution provider.
+   - Used for fast, sharp background removal and foreground bounding box extraction.
+2. `TripoSR` (Stability AI):
+   - Model loaded via `TSR.from_pretrained("stabilityai/TripoSR")`.
+   - Chunk size configured to `8192` for CUDA (or `1024` for CPU).
+   - Accepts foreground image composited on solid white background (255, 255, 255) with 85% canvas fit.
+   - Extracts 3D triplane scene codes and generates GLB mesh via marching cubes algorithm.
+3. `LCM Dreamshaper v7` (Stable Diffusion T2I):
+   - Loaded lazily (`load_t2i_pipeline()`) using `StableDiffusionPipeline` and `LCMScheduler`.
+   - Generates 256x256 2D images in 2 inference steps with guidance scale 8.0 for rapid execution.
+
+Endpoints:
+- `POST /summon` & `POST /api/summon`: Full local Text-to-3D pipeline (LCM -> U2Net -> TripoSR -> GLB binary response).
+- `POST /extract` & `POST /api/extract`: Image-to-3D pipeline (Base64/URL image -> U2Net -> TripoSR -> GLB binary response).
+- `GET /api/config`: Returns local engine status and configuration flags.
+
+Memory Guard (Sequential Orchestration):
+```python
+# Phase 1: Brain (T2I)
+image = generate_image(req.prompt)
+torch.cuda.empty_cache() # Purge VRAM
+
+# Phase 2: Body (I23D)
+mesh = generate_3d(image)
+torch.cuda.empty_cache() # Clean up VRAM
+```
+
+
+================================================================================
+5. CHAPTER 5: VPS PROXY GATEWAY & FALLBACK INFRASTRUCTURE
+================================================================================
+5.1 VPS Traffic Controller (`proxy_server.py` - Port 8000)
+Acts as an intelligent router and fallback gateway between client requests and cloud/local AI workers.
+
+Functionality:
+- Environment Loading: Reads credentials from `.env` (`FAL_KEY`, `REPLICATE_API_TOKEN`, `LOCAL_ENGINE_URL`).
+- Cloud Integration:
+  - Fal.ai API: Calls `https://fal.run/fal-ai/stable-diffusion-v35-large` for SD3.5 Large 2D images.
+  - Replicate API: Calls Replicate predictions endpoint (`version 528a60cd...`) for Stable Diffusion 3 with polling.
+- Resilient Local Fallback:
+  - If Cloud API keys are missing, invalid, or exhausted, automatically catches exceptions and falls back to Local Engine (`http://127.0.0.1:8001/api/summon`).
+  - Sets long HTTP timeouts (up to 600s) to handle CPU/GPU mesh extrusion safely.
+- Dynamic Reconfiguration (`POST /api/config`):
+  - Allows live updates of `FAL_KEY`, `REPLICATE_API_TOKEN`, and `LOCAL_ENGINE_URL` directly from the web UI, rewriting `.env` safely.
+
+
+================================================================================
+6. CHAPTER 6: DATABASE, STORAGE & SESSION MANAGEMENT
+================================================================================
+6.1 Primary Database (MySQL 8.0 / MariaDB)
+- Database Name: `sql_vectra_parsabe_com`
+- Host: `127.0.0.1` (Port 3306)
+- User: `sql_vectra_parsabe_com`
+- Character Set: `utf8mb4`
+
+6.2 Secondary Database (SQLite Fallback)
+- SQLite Path: `database/database.sqlite`
+- Used for zero-configuration local execution and automated unit testing (`phpunit.xml`).
+
+6.3 Database Schema & Migrations (`database/migrations/`)
+1. `0001_01_01_000000_create_users_table.php`:
+   - `users`: ID, name, email, email_verified_at, password, remember_token, timestamps.
+   - `password_reset_tokens`: email, token, created_at.
+   - `sessions`: ID, user_id, ip_address, user_agent, payload, last_activity.
+2. `0001_01_01_000001_create_cache_table.php`:
+   - `cache`: key, value, expiration.
+   - `cache_locks`: key, owner, expiration.
+3. `0001_01_01_000002_create_jobs_table.php`:
+   - `jobs`: queue background jobs.
+   - `job_batches`: batch job metadata.
+   - `failed_jobs`: failed job tracking and exception stack traces.
+
+6.4 Session & Cache Drivers
+- `SESSION_DRIVER=database` (Stores user sessions in `sessions` table).
+- `CACHE_STORE=database` (Caches operational states in `cache` table).
+- `QUEUE_CONNECTION=database` (Manages background jobs via `jobs` table).
+
+
+================================================================================
+7. CHAPTER 7: DOCKER CONTAINER & HOST INFRASTRUCTURE ECOSYSTEM
+================================================================================
+7.1 Host Server Environment
+- Server Domain: `vectra.parsabe.com`
+- Control Panel: aaPanel / BT-Panel environment under `/www/wwwroot/`
+- OS: Linux 6.6+ x86_64
+- Python Virtual Environment: `/www/wwwroot/venv/`
+
+7.2 Docker Containers Running on Host Server (`docker ps -a`)
+The server hosts several Docker microservices supporting the broader platform:
+
+1. `blackwall-service` (Container ID: `fa48ba635e59`):
+   - Image: `blackwall-ai`
+   - Port Mapping: `0.0.0.0:8000->8000/tcp`
+   - Role: Python FastAPI neural inference backend for adjacent Blackwall AI project.
+
+2. `ollama-ollama-1` (Container ID: `141d779448ce`):
+   - Image: `ollama/ollama:latest`
+   - Port Mapping: `0.0.0.0:11434->11434/tcp`
+   - Role: Local Large Language Model (LLM) serving engine.
+
+3. `jenkins-jenkins-1` (Container ID: `b1134790808d`):
+   - Image: `jenkins/jenkins:2.462.1-lts`
+   - Port Mapping: `0.0.0.0:14808->8080/tcp`
+   - Role: CI/CD automation and build server.
+
+4. `redis-redis-1` (Container ID: `d2abc85dd162`):
+   - Image: `redis:7.4.0`
+   - Role: High-performance in-memory cache and pub/sub message broker.
+
+7.3 Nginx Reverse Proxy Configuration (`/www/server/panel/vhost/nginx/vectra.parsabe.com.conf`)
+- SSL / TLS: Enabled with Let's Encrypt certificates (`fullchain.pem` & `privkey.pem`).
+- HTTP -> HTTPS: Automatic permanent redirect (301) to HTTPS.
+- Location Directives:
+  - `/` -> PHP 8.3 FPM serving Laravel `public/index.php`.
+  - `/api-fastapi/` -> Proxies to `http://127.0.0.1:8001/` (Local GPU Engine). Read timeout: 600s.
+  - `/api-proxy/` -> Proxies to `http://127.0.0.1:8000/` (VPS Proxy Gateway). Read timeout: 600s.
+
+
+================================================================================
+8. CHAPTER 8: COMPREHENSIVE FILE & DIRECTORY INVENTORY
+================================================================================
+Directory Path: `/www/wwwroot/vectra.parsabe.com`
+
+├── .env                                 # Environment variables (DB, API keys, Ports)
+├── .env.example                         # Template environment variables
+├── README.md                            # Primary project documentation & abstract
+├── CHANGELOG.md                         # Release history and updates
+├── LICENSE                              # Open source license (MIT)
+├── package.json                         # Node.js dependencies (Three.js, GSAP, GaussianSplats3D)
+├── package-lock.json                    # Locked NPM package versions
+├── composer.json                        # PHP dependencies (Laravel 11, Breeze)
+├── composer.lock                        # Locked Composer package versions
+├── vite.config.js                       # Vite asset bundler configuration
+├── tailwind.config.js                   # Tailwind CSS styling configuration
+├── postcss.config.js                    # PostCSS processor configuration
+├── phpunit.xml                          # PHPUnit test configuration
+├── artisan                              # Laravel CLI executive script
+│
+├── main.py                              # Local GPU Engine (FastAPI + PyTorch + TripoSR + LCM)
+├── proxy_server.py                      # VPS Proxy Gateway (FastAPI + Fal.ai + Replicate)
+├── start.sh                             # Daemon launcher script (starts main.py & proxy_server.py)
+├── stop.sh                              # Daemon shutdown script
+├── status.sh                            # Service health status checker script
+├── engine.log / engine.pid              # Logs & PID file for Local GPU Engine (Port 8001)
+├── proxy.log / proxy.pid                # Logs & PID file for VPS Proxy Gateway (Port 8000)
+├── requirements.txt                     # Python packages list
+│
+├── app/                                 # Laravel Application Backend
+│   ├── Http/Controllers/
+│   │   ├── VectraOrchestratorController.php  # API Orchestration Controller
+│   │   ├── ProfileController.php             # User Profile Management
+│   │   └── Controller.php                    # Base Controller
+│   ├── Http/Requests/                       # Request Validation Classes
+│   ├── Models/
+│   │   └── User.php                          # Eloquent User Model
+│   └── Providers/
+│       └── AppServiceProvider.php            # Application Service Provider
+│
+├── bootstrap/                           # Laravel Bootstrap Framework
+│   ├── app.php                           # Application Instance Instantiation
+│   └── providers.php                     # Providers array
+│
+├── config/                              # Framework Configuration Directory
+│   ├── app.php, auth.php, cache.php, database.php, filesystems.php,
+│   ├── logging.php, mail.php, queue.php, services.php, session.php
+│
+├── database/                            # Database Schemas & Migrations
+│   ├── database.sqlite                   # Local SQLite Database file
+│   ├── factories/UserFactory.php         # User Model Factory
+│   ├── seeders/DatabaseSeeder.php        # Database Seeder
+│   └── migrations/                       # SQL Table Migrations
+│
+├── public/                              # Nginx Public Web Root
+│   ├── index.php                         # Single Point Entry for Laravel
+│   ├── favicon.ico, robots.txt           # Standard Web Assets
+│   ├── main.mp3                          # Audio asset
+│   ├── plan.pdf                          # System Plan Document
+│   └── build/                            # Vite Compiled Production Assets (JS/CSS)
+│
+├── resources/                           # Frontend Source Files
+│   ├── css/
+│   │   └── app.css                       # Global Tailwind CSS & Cyberpunk Styles
+│   ├── js/
+│   │   ├── app.js                        # Main 3D Viewport Engine & Noclip Controls
+│   │   ├── main.js                       # Hub Portal Animation & Interactive JS
+│   │   ├── presentation.js               # 16-Stage Scrollytelling & WebGL Saturn Engine
+│   │   ├── splat-sort.worker.js          # Web Worker for 3D Gaussian Splat Sorting
+│   │   └── bootstrap.js                  # Axios setup
+│   ├── views/
+│   │   ├── main.blade.php                # System Hub Portal Page View
+│   │   ├── welcome.blade.php             # Viewport Spatial Core (Demo Page)
+│   │   ├── presentation.blade.php        # 16-Stage Thesis Presentation Deck
+│   │   ├── auth/                         # Authentication Views (Login, Register)
+│   │   ├── components/                   # Blade Blade UI Components
+│   │   ├── layouts/                      # App & Guest Layouts
+│   │   └── profile/                      # Profile Editing Views
+│   └── files/
+│       ├── optimize_ply.py               # Point cloud optimization script
+│       └── point_cloud_optimized.ply.gz  # Sample compressed Gaussian Splat scan
+│
+├── routes/                              # Route Definitions
+│   ├── web.php                           # Web routes (/, /demo, /presentation)
+│   ├── auth.php                          # Authentication routes
+│   └── console.php                       # Artisan console commands
+│
+├── TripoSR/                             # Stability AI TripoSR Core Library Submodule
+│   ├── run.py                            # TripoSR inference runner
+│   ├── requirements.txt                  # PyTorch/Triton dependencies
+│   ├── tsr/                              # TSR Neural Network Model Modules
+│   │   ├── system.py                     # TSR Triplane Reconstruction Architecture
+│   │   ├── utils.py                      # Mesh extraction & image preprocessing
+│   │   ├── bake_texture.py               # Texture baking utility
+│   │   └── models/                       # Transformer & NeRF Renderers
+│   └── examples/                         # Sample test images
+│
+└── Paper codes/                         # Master's Thesis LaTeX Source Code
+    ├── main.tex                          # Main LaTeX Document Template
+    ├── 0 - title.tex                     # Thesis Title & Author Details
+    ├── 1 - abstract.tex                  # Scientific Abstract
+    ├── 2 - Introduction.tex              # Introduction & Research Scope
+    ├── 3 - related-work.tex              # Literature Review
+    ├── 4 - method.tex                    # Mathematical Methodology & DBSE Algorithm
+    ├── 5 - experiments.tex               # Empirical Evaluation & Benchmarks
+    ├── 6 - discussion.tex               # Theoretical Analysis & OOM Mitigation
+    ├── 7 - conclusion.tex                # Concluding Remarks
+    ├── 8 - ai.tex                        # AI Integration Ethics
+    ├── appendix.tex                      # Supplementary Appendix
+    ├── references.bib                    # IEEE Citation Bibliography
+    └── img/                              # High-resolution figures & diagrams
+
+
+================================================================================
+9. CHAPTER 9: DEPLOYMENT, EXECUTION & OPERATIONAL MANUAL
+================================================================================
+9.1 Management Script Commands
+Navigate to `/www/wwwroot/vectra.parsabe.com` in terminal:
+
+1. Start all AI servers:
+   `./start.sh`
+   - Launches `main.py` on 127.0.0.1:8001 (GPU Engine)
+   - Launches `proxy_server.py` on 0.0.0.0:8000 (VPS Proxy Gateway)
+
+2. Check server status:
+   `./status.sh`
+   - Outputs running PID and active ports.
+
+3. Stop all AI servers:
+   `./stop.sh`
+   - Kills PIDs recorded in `engine.pid` and `proxy.pid`.
+
+4. Tail live server logs:
+   `tail -f engine.log`
+   `tail -f proxy.log`
+
+9.2 Manual CLI 3D Mesh Generation
+Run offline Text-to-3D generation directly via command line:
+`/www/wwwroot/venv/bin/python main.py "cyberpunk helmet"`
+- Output 2D PNG saved to: `output/output_<timestamp>.png`
+- Output 3D GLB saved to: `output/output_<timestamp>.glb`
+
+9.3 Troubleshooting & Hardware Verification
+- Check CUDA Status:
+  `nvidia-smi`
+- Clear Stale PyTorch VRAM:
+  `python3 -c "import torch; torch.cuda.empty_cache()"`
+- Nginx Log Verification:
+  `tail -n 50 /www/wwwlogs/vectra.parsabe.com.error.log`
+
+================================================================================
+END OF VECTRA SYSTEM DOCUMENTATION
+================================================================================
